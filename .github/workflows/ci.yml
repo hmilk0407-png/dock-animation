@@ -1,3 +1,21 @@
+# ============================================================
+# BUHI WORKS — Dock Animation QA (CI)
+# Next build → (並列) Vitest 単体 + Playwright E2E
+#
+# 設計:
+#   - build ジョブで next build を 1 回だけ実行し .next を成果物共有
+#     (アセットの有無に依存せず成功する前提。ビルドは webm/png/json の有無を問わない)
+#   - unit / e2e は build を依存関係にし、build 失敗時は走らせない (fail-fast)
+#   - e2e は .next を再利用して next start (二重ビルド回避)
+#
+# Dock アニメ固有の QA 要件はテストコード側に実装済み:
+#   - Lottie JSON モック: e2e の route.fulfill (最小 Lottie)
+#   - Surprised 1200ms → Idle: useDockState (SURPRISED_HOLD_MS=1200) を renderHook で検証
+#   - PNGseq 33ms×180f 進行: PngSeqClip の advance を vi.advanceTimersByTime で検証
+#   - MilkStatus 0.45s フェード: e2e で 500ms 待って判定
+#   CI 自体はこれらを直接扱わず、上記を検証するテストを実行するだけ。
+# ============================================================
+
 name: Dock Animation QA
 
 on:
@@ -6,86 +24,135 @@ on:
   pull_request:
     branches: [main, dev]
 
+# 同一ブランチ/PR の古い実行はキャンセル
+concurrency:
+  group: dock-qa-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# Dock アニメ QA 用 dummy env (build / next start で必要。実値は不要)
+env:
+  NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: dummy
+  ANTHROPIC_API_KEY: dummy
+
 jobs:
+  # ----------------------------------------------------------
+  # 1. Next build (gate + .next を成果物化)
+  # ----------------------------------------------------------
   build:
+    name: Next build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
+          cache: "npm" # ~/.npm を package-lock.json で自動キャッシュ
 
-      - name: Install dependencies
+      - name: Install deps (npm ci)
         run: npm ci
 
-      - name: Set dummy env
-        run: |
-          echo "NEXT_PUBLIC_SUPABASE_URL=dummy" >> $GITHUB_ENV
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=dummy" >> $GITHUB_ENV
-          echo "ANTHROPIC_API_KEY=dummy" >> $GITHUB_ENV
-
-      - name: Next build
+      - name: Next build (アセット有無に依存せず成功)
         run: npm run build
 
-      - name: Upload next-build artifact
+      - name: Upload .next build output
         uses: actions/upload-artifact@v4
         with:
           name: next-build
           path: .next
+          retention-days: 1
+          if-no-files-found: error
 
+  # ----------------------------------------------------------
+  # 2. Vitest 単体 (jsdom + fake timers)
+  #    PNGseq(180f/36f/54f) / Surprised 1200ms / Success loop=false
+  # ----------------------------------------------------------
   unit:
-    runs-on: ubuntu-latest
+    name: Vitest (unit / fake timers)
     needs: build
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
+          cache: "npm"
 
-      - name: Install dependencies
+      - name: Install deps (npm ci)
         run: npm ci
 
+      # tests/unit/**/*.test.tsx を実行 (vitest.config の include で限定)。
+      # 環境=jsdom / fake timers / next-dynamic スタブ / matchMedia スタブ は
+      # vitest.config.ts・vitest.setup.ts・テスト内 vi.mock で設定済み。
       - name: Run Vitest
-        run: npx vitest run --coverage=false
+        run: npx vitest run
 
+  # ----------------------------------------------------------
+  # 3. Playwright E2E (.next を再利用して next start)
+  #    8状態判別 / Surprised自動戻り / PNGseq簡易進行 /
+  #    Lottie fetch成功・失敗 / WebM loop / reduced-motion
+  # ----------------------------------------------------------
   e2e:
-    runs-on: ubuntu-latest
+    name: Playwright (e2e)
     needs: build
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node
+      - name: Setup Node 20
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: "20"
+          cache: "npm"
 
-      - name: Install dependencies
+      - name: Install deps (npm ci)
         run: npm ci
 
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps
+      # build ジョブの .next を取得 (二重ビルドを避ける。next start がこれを使う)
+      - name: Download .next build output
+        uses: actions/download-artifact@v4
+        with:
+          name: next-build
+          path: .next
 
+      # Playwright ブラウザ本体をキャッシュ
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('**/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-
+
+      # キャッシュミス: ブラウザ + OS 依存を導入 / ヒット: OS 依存のみ
+      - name: Install Playwright (browsers + OS deps)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps
+      - name: Install Playwright OS deps (cache hit)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install-deps
+
+      # e2e/ を実行。playwright.config の webServer が CI では next start を起動し
+      # (.next を再利用)、localhost:3000 で待受。Lottie JSON は route.fulfill でモック。
       - name: Run Playwright E2E
         run: npx playwright test
 
-      - name: Upload Playwright report
+      # trace(on-first-retry)・レポートを保存 (失敗調査用)。retries>0 が前提。
+      - name: Upload Playwright report & traces
+        if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
-        if: always()
         with:
           name: playwright-report
-          path: playwright-report
-
-      - name: Upload Playwright traces
-        uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: traces
-          path: test-results
-
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore

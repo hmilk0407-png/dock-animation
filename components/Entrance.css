@@ -1,0 +1,303 @@
+/* ============================================================
+   BUHI WORKS Entrance — 近未来エントランス
+   - 配色は ZERO ONE ロゴのロイヤルブルー(#1B449C)と
+     BUHI WORKS ブルー(#2E5FD8)を基調にした夜のネイビー
+   - ループ演出(光ライン・オーロラ)はCSS、
+     入場演出(フェード+スライドアップ)は Framer Motion 側
+   - フォント(Zen Maru Gothic / Noto Sans JP)は app/globals.css で読込済み
+   ============================================================ */
+
+.bwEnt-root {
+  --ent-base-1: #0e1b3e;
+  --ent-base-2: #070d1f;
+  --ent-base-3: #0a1230;
+  --ent-blue: #2e5fd8;      /* BUHI WORKS ブルー */
+  --ent-logo-blue: #1b449c; /* ZERO ONE ロゴブルー */
+  --ent-ice: #f2f6ff;
+  --ent-glow: #7fa8ff;
+  --ent-maru: "Zen Maru Gothic", "Hiragino Maru Gothic ProN", "Noto Sans JP",
+    sans-serif;
+  --ent-body: "Noto Sans JP", "Hiragino Kaku Gothic ProN", "Yu Gothic",
+    sans-serif;
+
+  position: relative;
+  min-height: 100dvh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(
+      56rem 34rem at 50% 28%,
+      rgba(46, 95, 216, 0.2),
+      transparent 62%
+    ),
+    linear-gradient(
+      160deg,
+      var(--ent-base-1) 0%,
+      var(--ent-base-2) 56%,
+      var(--ent-base-3) 100%
+    );
+  color: var(--ent-ice);
+  font-family: var(--ent-body);
+}
+
+/* ---------- 背景: ゆっくり漂うオーロラ ---------- */
+.bwEnt-aurora {
+  position: absolute;
+  width: 46rem;
+  height: 46rem;
+  left: 50%;
+  top: -14rem;
+  border-radius: 50%;
+  background: radial-gradient(
+    circle,
+    rgba(46, 95, 216, 0.3),
+    rgba(27, 68, 156, 0.12) 45%,
+    transparent 70%
+  );
+  filter: blur(70px);
+  transform: translateX(-50%);
+  animation: bwEntAurora 16s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes bwEntAurora {
+  0%,
+  100% {
+    transform: translateX(-58%) translateY(0);
+  }
+  50% {
+    transform: translateX(-42%) translateY(2.5rem);
+  }
+}
+
+/* ---------- 背景: 斜めに流れる光ライン ---------- */
+.bwEnt-beams {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+.bwEnt-beam {
+  position: absolute;
+  left: -30vw;
+  height: 2px;
+  width: 58vw;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent 6%,
+    rgba(127, 168, 255, 0.55) 45%,
+    rgba(46, 95, 216, 0.7) 55%,
+    transparent 94%
+  );
+  filter: drop-shadow(0 0 6px rgba(46, 95, 216, 0.55));
+  animation: bwEntBeam linear infinite;
+}
+.bwEnt-beam:nth-child(1) {
+  top: 18%;
+  animation-duration: 13s;
+  opacity: 0.8;
+}
+.bwEnt-beam:nth-child(2) {
+  top: 38%;
+  width: 44vw;
+  animation-duration: 17s;
+  animation-delay: -6s;
+  opacity: 0.5;
+}
+.bwEnt-beam:nth-child(3) {
+  top: 62%;
+  animation-duration: 15s;
+  animation-delay: -3s;
+  opacity: 0.65;
+}
+.bwEnt-beam:nth-child(4) {
+  top: 82%;
+  width: 40vw;
+  animation-duration: 21s;
+  animation-delay: -10s;
+  opacity: 0.4;
+}
+@keyframes bwEntBeam {
+  from {
+    transform: rotate(-22deg) translateX(-50vw);
+  }
+  to {
+    transform: rotate(-22deg) translateX(170vw);
+  }
+}
+
+/* ---------- 背景: 周辺減光 ---------- */
+.bwEnt-vignette {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(
+    120% 90% at 50% 50%,
+    transparent 55%,
+    rgba(4, 8, 20, 0.55) 100%
+  );
+  pointer-events: none;
+}
+
+/* ---------- ZERO ONE ロゴ (左上固定) ----------
+   ロゴ画像は白背景のJPGのため、白いプレートに載せて
+   「受付の社名プレート」として意図的に見せる */
+.bwEnt-logo {
+  position: fixed;
+  top: clamp(14px, 3vw, 24px);
+  left: clamp(14px, 3vw, 24px);
+  z-index: 30;
+  display: inline-flex;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 18px rgba(4, 10, 28, 0.45),
+    0 0 0 1px rgba(127, 168, 255, 0.25);
+}
+.bwEnt-logo img {
+  display: block;
+  width: clamp(112px, 15vw, 168px);
+  height: auto;
+}
+
+/* ---------- 中央コンテンツ ---------- */
+.bwEnt-content {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 760px;
+  padding: 120px 20px 72px;
+  text-align: center;
+}
+
+/* 見出し上のミニロックアップ (ダーク用反転) */
+.bwEnt-eyebrow {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.bwEnt-lockup {
+  display: inline-flex;
+  align-items: stretch;
+  font-family: var(--ent-maru);
+  font-style: italic;
+  font-weight: 900;
+  font-size: 12px;
+  letter-spacing: 1px;
+}
+.bwEnt-lockup .bwEnt-l1 {
+  background: var(--ent-ice);
+  color: var(--ent-base-1);
+  padding: 2px 8px;
+}
+.bwEnt-lockup .bwEnt-l2 {
+  border: 2px solid var(--ent-ice);
+  color: var(--ent-ice);
+  padding: 2px 8px;
+}
+.bwEnt-eyebrowCaption {
+  font-size: 10px;
+  letter-spacing: 0.34em;
+  text-indent: 0.34em; /* 字間ぶんの中央ずれ補正 */
+  color: rgba(226, 236, 255, 0.65);
+}
+
+/* タイトル */
+.bwEnt-title {
+  margin: 22px 0 0;
+  font-family: var(--ent-maru);
+  font-weight: 900;
+  font-size: clamp(28px, 6vw, 56px);
+  letter-spacing: 0.02em;
+  line-height: 1.3;
+  text-shadow: 0 0 24px rgba(46, 95, 216, 0.35);
+}
+.bwEnt-brand {
+  background: linear-gradient(
+    92deg,
+    #cfe0ff 0%,
+    var(--ent-glow) 45%,
+    var(--ent-blue) 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  white-space: nowrap;
+  /* background-clip:text と text-shadow の併用は WebKit で
+     影が文字の前面に描かれるため、こちらは drop-shadow で光らせる */
+  text-shadow: none;
+  filter: drop-shadow(0 0 14px rgba(46, 95, 216, 0.45));
+}
+
+/* タイトル下の受付ライン (Framer側で scaleX 0→1 を演出) */
+.bwEnt-line {
+  height: 2px;
+  width: min(320px, 62vw);
+  margin-top: 20px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    var(--ent-glow) 30%,
+    var(--ent-blue) 70%,
+    transparent
+  );
+  box-shadow: 0 0 14px rgba(46, 95, 216, 0.8);
+  transform-origin: center;
+}
+
+/* サブコピー */
+.bwEnt-sub {
+  margin: 20px 0 0;
+  font-size: clamp(13px, 1.7vw, 15px);
+  line-height: 2;
+  letter-spacing: 0.04em;
+  color: rgba(226, 236, 255, 0.86);
+}
+.bwEnt-sub em {
+  font-style: normal;
+  font-weight: 700;
+  color: var(--ent-glow);
+}
+
+/* 入室ボタン (onEnter を渡した場合のみ表示) */
+.bwEnt-cta {
+  margin-top: 34px;
+  padding: 12px 34px;
+  border-radius: 999px;
+  font-family: var(--ent-maru);
+  font-weight: 900;
+  font-size: 15px;
+  letter-spacing: 0.12em;
+  color: var(--ent-ice);
+  background: linear-gradient(
+    180deg,
+    rgba(46, 95, 216, 0.92),
+    rgba(27, 68, 156, 0.92)
+  );
+  border: 1px solid rgba(127, 168, 255, 0.55);
+  box-shadow: 0 6px 24px rgba(46, 95, 216, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease;
+}
+.bwEnt-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 10px 30px rgba(46, 95, 216, 0.55),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+.bwEnt-cta:focus-visible {
+  outline: 2px solid var(--ent-glow);
+  outline-offset: 3px;
+}
+
+/* ---------- モーション配慮 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .bwEnt-aurora,
+  .bwEnt-beam {
+    animation: none !important;
+  }
+}
