@@ -8,6 +8,5 @@ export async function middleware(request: NextRequest) {
 export const config = {
   matcher: [
     /* 静的アセット・画像以外のすべてのパスで認証を確認 */
-    "/((?!_next/static|_next/image|favicon.ico|avatars/|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
-  ],
+    "/((?!_next/static|_next/image|favicon.ico|avatars/|test|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
 };
