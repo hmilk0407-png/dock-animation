@@ -88,10 +88,6 @@ export default function DockTestPage() {
               </span>
             </div>
             <div style={{ fontSize: 13, marginTop: 8, lineHeight: 1.7 }}>{cur.desc}</div>
-            <div style={{ marginTop: 14, display: "flex", alignItems: "center", gap: 10 }}>
-              <span style={{ fontSize: 12, color: "#B0A79C" }}>Dock実寸(48px):</span>
-              <TestDock state={state} reduced={reduced} size={48} />
-            </div>
           </div>
         </div>
 
