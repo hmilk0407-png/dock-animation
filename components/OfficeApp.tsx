@@ -4,18 +4,18 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import ChatPanel, { type ChatSendResult } from "./ChatPanel";
-import Dock from "./Dock";
 import Entrance from "./Entrance";
 import ExpertModal from "./ExpertModal";
-import Header from "./Header";
 import HistoryPanel from "./HistoryPanel";
+import MilkAnimation from "./MilkAnimation";
 import Avatar from "./avatars/Avatar";
 import { useExperts } from "@/hooks/useExperts";
 import { useHistory } from "@/hooks/useHistory";
+import { DockState } from "@/lib/dock/DockState";
 import { useDockState } from "@/lib/dock/useDockState";
 import { SECRETARY_SLUG } from "@/lib/experts";
 import { createClient } from "@/lib/supabase/client";
-import { BG, BLUE, MARU, TEXT } from "@/lib/theme";
+import { BG, BLUE, CARD, CHIP, LINE, MARU, MUTED, NAVY, RED, TEXT } from "@/lib/theme";
 import type {
   Attachment,
   ContentBlock,
@@ -42,9 +42,37 @@ function kindFromName(n: string): "image" | "pdf" | "text" {
   return "text";
 }
 
+
+/* ---------- エージェントパネル: 状態表示ラベル ---------- */
+const AGENT_TASK: Record<DockState, string> = {
+  [DockState.Idle]: "受付でお待ちしています",
+  [DockState.Focus]: "ご依頼を確認しています",
+  [DockState.Success]: "おつなぎできました！",
+  [DockState.Error]: "うまくいきませんでした",
+  [DockState.Thinking]: "ご提案を考えています",
+  [DockState.Listening]: "お話をうかがっています",
+  [DockState.Loading]: "受付からおつなぎしています",
+  [DockState.Surprised]: "少し驚いています",
+  [DockState.Transition]: "切り替え中…",
+};
+const AGENT_STATUS: Record<DockState, { label: string; color: string }> = {
+  [DockState.Idle]: { label: "オンライン", color: "#1E9E6A" },
+  [DockState.Focus]: { label: "受付中", color: BLUE },
+  [DockState.Listening]: { label: "受付中", color: BLUE },
+  [DockState.Thinking]: { label: "作業中", color: BLUE },
+  [DockState.Loading]: { label: "作業中", color: BLUE },
+  [DockState.Success]: { label: "完了", color: "#1E9E6A" },
+  [DockState.Error]: { label: "エラー", color: RED },
+  [DockState.Surprised]: { label: "対応中", color: "#E8912D" },
+  [DockState.Transition]: { label: "切替中", color: MUTED },
+};
+
 /* ============================================================
    OfficeApp — BUHI WORKS メインオーケストレーション
-   構成: Entrance(初回オーバーレイ) → ChatPanel(会話) + Dock(専門家カード)
+   構成: Entrance(初回オーバーレイ) → 3カラム
+         [左レール: 専門家スイッチャ+履歴/ログアウト]
+         [中央: エージェントパネル (大ミルク + STATUS/TASK/STATSカード)]
+         [右: ChatPanel(会話)]
 
    - onSend(text) を ChatPanel から受け取り、
        assign(担当決定) → answer(回答生成) → 履歴保存 を実行して
@@ -278,79 +306,346 @@ export default function OfficeApp({
     router.refresh();
   }
 
+  const agentStatus = AGENT_STATUS[dock.state];
+
   return (
-    <div className="h-screen flex flex-col" style={{ background: BG, color: TEXT }}>
-      {/* ---------- ブランドヘッダー (sticky top-0 / 近未来トーン) ---------- */}
-      <Header
-        actions={
-          <>
-            {/* 現在担当 / 指名中のチップ */}
-            {headerExpert && (
-              <div
-                className="hidden sm:flex items-center gap-1.5 px-2 py-1 rounded-full"
+    <div className="h-screen flex" style={{ background: BG, color: TEXT }}>
+      {/* ==================== 左レール: ナビ + 専門家スイッチャ ==================== */}
+      <aside
+        className="flex-shrink-0 flex flex-col items-center py-3 gap-2 overflow-y-auto buhi-scroll"
+        style={{ width: 64, background: NAVY }}
+      >
+        <div
+          title="BUHI WORKS"
+          className="flex items-center justify-center rounded-xl flex-shrink-0"
+          style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)", fontSize: 20 }}
+        >
+          🐾
+        </div>
+        <div style={{ width: 28, height: 1, background: "rgba(255,255,255,0.18)", margin: "4px 0" }} />
+
+        {/* 専門家アバター (クリックで指名/解除。指名中は ✎/✕ を表示) */}
+        {experts.map((e) => {
+          const isPinned = pinnedSlug === e.slug;
+          const isWorking = busy && currentExpert?.slug === e.slug;
+          const ackTs = dockAck?.expertSlug === e.slug ? dockAck.ts : null;
+          return (
+            <div key={e.slug} className="relative flex-shrink-0">
+              <motion.button
+                key={ackTs ?? "static"}
+                animate={ackTs ? { y: [0, -7, 0] } : { y: 0 }}
+                transition={{ duration: 0.5, ease: "easeOut" }}
+                onClick={() => setPinnedSlug(isPinned ? null : e.slug)}
+                title={`${e.name}（${e.specialty}）${isPinned ? " — 指名中（タップで解除）" : ""}`}
+                aria-label={`${e.name}を${isPinned ? "指名解除" : "指名"}`}
+                className="rounded-full block"
                 style={{
-                  background: "rgba(46,95,216,0.22)",
-                  border: "1px solid rgba(127,168,255,0.45)",
+                  width: 44,
+                  height: 44,
+                  padding: 0,
+                  overflow: "hidden",
+                  background: "transparent",
+                  border: isPinned
+                    ? "2.5px solid #7FA8FF"
+                    : isWorking
+                      ? "2.5px solid #FFD37F"
+                      : "2px solid rgba(255,255,255,0.25)",
+                  boxShadow: isPinned ? "0 0 0 3px rgba(127,168,255,0.25)" : "none",
                 }}
               >
-                <Avatar expert={headerExpert} size={18} badge={false} />
-                <span
-                  style={{ fontSize: 10.5, fontWeight: 900, fontFamily: MARU, color: "#F2F6FF" }}
-                >
-                  {pinnedExpert ? `指名: ${pinnedExpert.name}` : `担当: ${currentExpert!.name}`}
-                </span>
-              </div>
-            )}
-            {/* 履歴ボタン */}
-            <button
-              onClick={() => setShowHistory(true)}
-              aria-label="依頼履歴を開く"
-              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg flex-shrink-0"
+                <Avatar expert={e} size={39} badge={false} working={isWorking} />
+              </motion.button>
+              {isPinned && (
+                <div className="absolute -right-1.5 -bottom-1 flex gap-0.5">
+                  <button
+                    onClick={() => setEditingExpert(e)}
+                    title="設定"
+                    aria-label={`${e.name}の設定を開く`}
+                    style={{
+                      width: 17,
+                      height: 17,
+                      borderRadius: 9,
+                      background: "#F2F6FF",
+                      color: NAVY,
+                      fontSize: 9,
+                      lineHeight: "17px",
+                      fontWeight: 900,
+                    }}
+                  >
+                    ✎
+                  </button>
+                  {!e.isDefault && (
+                    <button
+                      onClick={() => handleRemoveExpert(e.slug)}
+                      title="チームから外す"
+                      aria-label={`${e.name}をチームから外す`}
+                      style={{
+                        width: 17,
+                        height: 17,
+                        borderRadius: 9,
+                        background: "#F2F6FF",
+                        color: RED,
+                        fontSize: 9,
+                        lineHeight: "17px",
+                        fontWeight: 900,
+                      }}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        {/* 採用 */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          title="専門家を採用"
+          aria-label="新しい専門家を採用"
+          className="flex-shrink-0"
+          style={{
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            border: "1.5px dashed rgba(255,255,255,0.5)",
+            color: "rgba(255,255,255,0.85)",
+            fontWeight: 900,
+            fontSize: 16,
+            background: "transparent",
+          }}
+        >
+          ＋
+        </button>
+
+        <div className="flex-1" />
+
+        {/* 履歴 / ログアウト */}
+        <button
+          onClick={() => setShowHistory(true)}
+          title="依頼履歴"
+          aria-label="依頼履歴を開く"
+          className="relative flex-shrink-0"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            background: "rgba(255,255,255,0.08)",
+            color: "#F2F6FF",
+            fontSize: 15,
+          }}
+        >
+          🕘
+          {history.entries.length > 0 && (
+            <span
+              className="absolute -top-1 -right-1"
               style={{
-                background: "rgba(46,95,216,0.22)",
-                border: "1px solid rgba(127,168,255,0.45)",
-                fontSize: 12,
-                fontWeight: 700,
-                color: "#F2F6FF",
+                background: "#F2F6FF",
+                color: NAVY,
+                borderRadius: 8,
+                padding: "0 5px",
+                fontSize: 9,
+                fontWeight: 900,
               }}
             >
-              🕘 履歴
-              {history.entries.length > 0 && (
-                <span
+              {history.entries.length}
+            </span>
+          )}
+        </button>
+        <button
+          onClick={logout}
+          title="ログアウト"
+          aria-label="ログアウト"
+          className="flex-shrink-0"
+          style={{
+            width: 40,
+            height: 40,
+            borderRadius: 12,
+            border: "1px solid rgba(255,255,255,0.3)",
+            color: "rgba(255,255,255,0.8)",
+            fontSize: 13,
+            background: "transparent",
+          }}
+        >
+          ⏻
+        </button>
+      </aside>
+
+      {/* ==================== 中央: エージェントパネル ==================== */}
+      <main className="flex-1 min-w-0 hidden md:flex flex-col">
+        <div
+          className="flex items-center gap-2 px-5 py-3 flex-shrink-0"
+          style={{ borderBottom: `1px solid ${LINE}`, background: CARD }}
+        >
+          <span style={{ fontFamily: MARU, fontWeight: 900, fontSize: 17, color: NAVY }}>
+            🐾 BUHI WORKS
+          </span>
+          <span style={{ fontSize: 10.5, color: MUTED, fontWeight: 700 }}>
+            AIバックオフィス v2.0
+          </span>
+        </div>
+
+        <div className="flex-1 min-h-0 overflow-y-auto buhi-scroll px-5 py-5">
+          <div className="flex flex-col lg:flex-row gap-5 items-center lg:items-start justify-center">
+            {/* ステータスカード列 */}
+            <div className="flex flex-col gap-3 w-full lg:w-60 flex-shrink-0 order-2 lg:order-1">
+              <div
+                className="rounded-2xl px-4 py-3"
+                style={{ background: CARD, border: `1px solid ${LINE}` }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 900, color: MUTED, letterSpacing: 0.6 }}>
+                  AGENT STATUS
+                </div>
+                <div className="flex items-center gap-2 mt-1">
+                  <span
+                    className="inline-block rounded-full"
+                    style={{ width: 9, height: 9, background: agentStatus.color }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: MARU,
+                      fontWeight: 900,
+                      fontSize: 16,
+                      color: agentStatus.color,
+                    }}
+                  >
+                    {agentStatus.label}
+                  </span>
+                </div>
+              </div>
+
+              <div
+                className="rounded-2xl px-4 py-3"
+                style={{ background: CARD, border: `1px solid ${LINE}` }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 900, color: MUTED, letterSpacing: 0.6 }}>
+                  CURRENT TASK
+                </div>
+                <div
+                  className="mt-1"
+                  style={{ fontFamily: MARU, fontWeight: 800, fontSize: 13.5, color: TEXT }}
+                >
+                  {AGENT_TASK[dock.state]}
+                </div>
+              </div>
+
+              <div
+                className="rounded-2xl px-4 py-3"
+                style={{ background: CARD, border: `1px solid ${LINE}` }}
+              >
+                <div style={{ fontSize: 10, fontWeight: 900, color: MUTED, letterSpacing: 0.6 }}>
+                  担当エキスパート
+                </div>
+                {headerExpert ? (
+                  <div className="flex items-center gap-2 mt-1.5">
+                    <Avatar expert={headerExpert} size={26} badge={false} />
+                    <div className="min-w-0">
+                      <div
+                        className="truncate"
+                        style={{ fontFamily: MARU, fontWeight: 900, fontSize: 13.5 }}
+                      >
+                        {headerExpert.name}
+                        {pinnedExpert && (
+                          <span style={{ fontSize: 9.5, color: BLUE, marginLeft: 5 }}>指名中</span>
+                        )}
+                      </div>
+                      <div className="truncate" style={{ fontSize: 10.5, color: MUTED }}>
+                        {headerExpert.specialty}
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mt-1" style={{ fontSize: 12, color: MUTED }}>
+                    ご依頼に応じて受付がおつなぎします
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* ミルク本体 + AGENT STATS */}
+            <div className="flex flex-col items-center gap-4 flex-1 min-w-0 order-1 lg:order-2">
+              <div style={{ width: 280, height: 280 }} className="relative flex-shrink-0">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={dock.state}
+                    initial={{ opacity: 0, scale: 0.96 }}
+                    animate={{ opacity: dock.isTransitioning ? 0.85 : 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.96 }}
+                    transition={{ duration: 0.45, ease: "easeInOut" }}
+                    className="absolute inset-0 flex items-center justify-center"
+                  >
+                    <MilkAnimation state={dock.state} size={280} />
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+
+              <div
+                className="w-full rounded-2xl"
+                style={{
+                  maxWidth: 420,
+                  background: CARD,
+                  border: `1px solid ${LINE}`,
+                  boxShadow: "0 2px 12px rgba(20,38,62,0.06)",
+                }}
+              >
+                <div
+                  className="px-4 pt-3 pb-2"
                   style={{
-                    background: "#F2F6FF",
-                    color: BLUE,
-                    borderRadius: 9,
-                    padding: "0 6px",
-                    fontSize: 10,
+                    fontFamily: MARU,
                     fontWeight: 900,
+                    fontSize: 13,
+                    color: NAVY,
+                    borderBottom: `1px solid ${LINE}`,
                   }}
                 >
-                  {history.entries.length}
-                </span>
-              )}
-            </button>
-            {/* ログアウトボタン */}
-            <button
-              onClick={logout}
-              aria-label="ログアウト"
-              className="px-2.5 py-1.5 rounded-lg flex-shrink-0"
-              style={{
-                background: "transparent",
-                border: "1px solid rgba(242,246,255,0.35)",
-                fontSize: 12,
-                fontWeight: 700,
-                color: "rgba(242,246,255,0.8)",
-              }}
-            >
-              ログアウト
-            </button>
-          </>
-        }
-      />
+                  AGENT STATS
+                </div>
+                <dl
+                  className="px-4 py-3 grid gap-x-5 gap-y-1.5"
+                  style={{ fontSize: 12, gridTemplateColumns: "auto 1fr" }}
+                >
+                  <dt style={{ color: MUTED, fontWeight: 700 }}>名前</dt>
+                  <dd style={{ fontWeight: 700 }}>ミルク（受付・秘書）</dd>
+                  <dt style={{ color: MUTED, fontWeight: 700 }}>モデル</dt>
+                  <dd>BUHI WORKS v2.0</dd>
+                  <dt style={{ color: MUTED, fontWeight: 700 }}>専門家</dt>
+                  <dd>{experts.length}名 在籍</dd>
+                  <dt style={{ color: MUTED, fontWeight: 700 }}>状態</dt>
+                  <dd>{AGENT_TASK[dock.state]}</dd>
+                  <dt style={{ color: MUTED, fontWeight: 700 }}>言語</dt>
+                  <dd>日本語</dd>
+                </dl>
+              </div>
+            </div>
+          </div>
+        </div>
+      </main>
 
-      {/* ---------- 中央: ChatPanel + Dock ---------- */}
-      <div className="relative flex-1 flex flex-col min-h-0">
+      {/* ==================== 右: エージェント・チャット ==================== */}
+      <section
+        className="flex flex-col min-h-0 flex-1 md:flex-none md:w-[400px] lg:w-[430px]"
+        style={{ background: CARD, borderLeft: `1px solid ${LINE}` }}
+      >
+        <div
+          className="px-4 py-3 flex items-center justify-between flex-shrink-0"
+          style={{ borderBottom: `1px solid ${LINE}` }}
+        >
+          <span style={{ fontFamily: MARU, fontWeight: 900, fontSize: 14, color: NAVY }}>
+            エージェント・チャット
+          </span>
+          {headerExpert && (
+            <div
+              className="flex items-center gap-1.5 px-2 py-1 rounded-full"
+              style={{ background: CHIP, border: `1px solid ${LINE}` }}
+            >
+              <Avatar expert={headerExpert} size={18} badge={false} />
+              <span style={{ fontSize: 10.5, fontWeight: 900, fontFamily: MARU, color: BLUE }}>
+                {pinnedExpert ? `指名: ${pinnedExpert.name}` : `担当: ${currentExpert!.name}`}
+              </span>
+            </div>
+          )}
+        </div>
         <ChatPanel
           experts={experts}
           onSend={handleSend}
@@ -359,20 +654,7 @@ export default function OfficeApp({
           reuseText={reuseText}
           className="flex flex-col flex-1 min-h-0"
         />
-        <Dock
-          experts={experts}
-          milkState={dock.state}
-          milkTransitioning={dock.isTransitioning}
-          workingExpert={busy ? currentExpert : null}
-          uiMode={uiMode}
-          reuseSignal={dockAck}
-          onOpenExpert={(e) => setEditingExpert(e)}
-          onAddExpert={() => setShowAddModal(true)}
-          onRemoveExpert={handleRemoveExpert}
-          selectedSlug={pinnedSlug}
-          onSelectExpert={(e) => setPinnedSlug(e ? e.slug : null)}
-        />
-      </div>
+      </section>
 
       {/* ---------- エントランス (初回のみ全画面オーバーレイ) ---------- */}
       <AnimatePresence>
