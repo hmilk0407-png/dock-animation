@@ -310,65 +310,108 @@ export default function OfficeApp({
 
   return (
     <div className="h-screen flex" style={{ background: BG, color: TEXT }}>
-      {/* ==================== 左レール: ナビ + 専門家スイッチャ ==================== */}
+      {/* ==================== 左レール: 専門家名簿 (md以上=200px名前付き / 未満=64pxアイコンのみ) ==================== */}
       <aside
-        className="flex-shrink-0 flex flex-col items-center py-3 gap-2 overflow-y-auto buhi-scroll"
-        style={{ width: 64, background: NAVY }}
+        className="flex-shrink-0 flex flex-col py-3 gap-1.5 overflow-y-auto buhi-scroll w-16 md:w-[200px] items-center md:items-stretch md:px-2.5"
+        style={{ background: NAVY }}
       >
-        <div
-          title="BUHI WORKS"
-          className="flex items-center justify-center rounded-xl flex-shrink-0"
-          style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)", fontSize: 20 }}
-        >
-          🐾
+        <div className="flex items-center gap-2 px-1 md:px-2 mb-1">
+          <div
+            className="flex items-center justify-center rounded-xl flex-shrink-0"
+            style={{ width: 40, height: 40, background: "rgba(255,255,255,0.08)", fontSize: 20 }}
+          >
+            🐾
+          </div>
+          <div className="hidden md:block min-w-0">
+            <div style={{ fontFamily: MARU, fontWeight: 900, fontSize: 13, color: "#F2F6FF" }}>
+              専門家チーム
+            </div>
+            <div style={{ fontSize: 10, color: "rgba(255,255,255,0.55)" }}>{experts.length}名 在籍</div>
+          </div>
         </div>
-        <div style={{ width: 28, height: 1, background: "rgba(255,255,255,0.18)", margin: "4px 0" }} />
+        <div style={{ height: 1, background: "rgba(255,255,255,0.15)", margin: "2px 4px 4px" }} />
 
-        {/* 専門家アバター (クリックで指名/解除。指名中は ✎/✕ を表示) */}
+        {/* 専門家 (クリックで指名/解除。指名中は ✎/✕) */}
         {experts.map((e) => {
           const isPinned = pinnedSlug === e.slug;
           const isWorking = busy && currentExpert?.slug === e.slug;
           const ackTs = dockAck?.expertSlug === e.slug ? dockAck.ts : null;
           return (
-            <div key={e.slug} className="relative flex-shrink-0">
+            <div key={e.slug} className="relative flex-shrink-0 w-full flex justify-center md:justify-stretch">
               <motion.button
                 key={ackTs ?? "static"}
-                animate={ackTs ? { y: [0, -7, 0] } : { y: 0 }}
+                animate={ackTs ? { y: [0, -6, 0] } : { y: 0 }}
                 transition={{ duration: 0.5, ease: "easeOut" }}
                 onClick={() => setPinnedSlug(isPinned ? null : e.slug)}
                 title={`${e.name}（${e.specialty}）${isPinned ? " — 指名中（タップで解除）" : ""}`}
                 aria-label={`${e.name}を${isPinned ? "指名解除" : "指名"}`}
-                className="rounded-full block"
+                className="flex items-center gap-2.5 rounded-xl text-left md:w-full md:px-2 md:py-1.5"
                 style={{
-                  width: 44,
-                  height: 44,
-                  padding: 0,
-                  overflow: "hidden",
-                  background: "transparent",
-                  border: isPinned
-                    ? "2.5px solid #7FA8FF"
+                  background: isPinned
+                    ? "rgba(127,168,255,0.22)"
                     : isWorking
-                      ? "2.5px solid #FFD37F"
-                      : "2px solid rgba(255,255,255,0.25)",
-                  boxShadow: isPinned ? "0 0 0 3px rgba(127,168,255,0.25)" : "none",
+                      ? "rgba(255,211,127,0.16)"
+                      : "transparent",
+                  border: isPinned
+                    ? "1.5px solid #7FA8FF"
+                    : isWorking
+                      ? "1.5px solid #FFD37F"
+                      : "1.5px solid transparent",
                 }}
               >
-                <Avatar expert={e} size={39} badge={false} working={isWorking} />
+                <span
+                  className="rounded-full flex-shrink-0 overflow-hidden block"
+                  style={{
+                    width: 44,
+                    height: 44,
+                    border: isPinned
+                      ? "2px solid #7FA8FF"
+                      : isWorking
+                        ? "2px solid #FFD37F"
+                        : "2px solid rgba(255,255,255,0.25)",
+                  }}
+                >
+                  <Avatar expert={e} size={40} badge={false} working={isWorking} />
+                </span>
+                <span className="hidden md:block min-w-0 flex-1">
+                  <span
+                    className="block truncate"
+                    style={{ fontFamily: MARU, fontWeight: 900, fontSize: 13, color: "#F2F6FF" }}
+                  >
+                    {e.name}
+                    {isPinned && (
+                      <span style={{ fontSize: 9.5, color: "#BFD3FF", marginLeft: 5, fontWeight: 700 }}>
+                        指名中
+                      </span>
+                    )}
+                    {isWorking && !isPinned && (
+                      <span style={{ fontSize: 9.5, color: "#FFE3A3", marginLeft: 5, fontWeight: 700 }}>
+                        対応中
+                      </span>
+                    )}
+                  </span>
+                  <span
+                    className="block truncate"
+                    style={{ fontSize: 10.5, color: "rgba(255,255,255,0.6)" }}
+                  >
+                    {e.specialty}
+                  </span>
+                </span>
               </motion.button>
               {isPinned && (
-                <div className="absolute -right-1.5 -bottom-1 flex gap-0.5">
+                <div className="absolute right-0 md:right-2 -bottom-1 md:bottom-auto md:top-1/2 md:-translate-y-1/2 flex gap-0.5">
                   <button
                     onClick={() => setEditingExpert(e)}
                     title="設定"
                     aria-label={`${e.name}の設定を開く`}
                     style={{
-                      width: 17,
-                      height: 17,
-                      borderRadius: 9,
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
                       background: "#F2F6FF",
                       color: NAVY,
-                      fontSize: 9,
-                      lineHeight: "17px",
+                      fontSize: 10,
+                      lineHeight: "20px",
                       fontWeight: 900,
                     }}
                   >
@@ -380,13 +423,13 @@ export default function OfficeApp({
                       title="チームから外す"
                       aria-label={`${e.name}をチームから外す`}
                       style={{
-                        width: 17,
-                        height: 17,
-                        borderRadius: 9,
+                        width: 20,
+                        height: 20,
+                        borderRadius: 10,
                         background: "#F2F6FF",
                         color: RED,
-                        fontSize: 9,
-                        lineHeight: "17px",
+                        fontSize: 10,
+                        lineHeight: "20px",
                         fontWeight: 900,
                       }}
                     >
@@ -404,19 +447,19 @@ export default function OfficeApp({
           onClick={() => setShowAddModal(true)}
           title="専門家を採用"
           aria-label="新しい専門家を採用"
-          className="flex-shrink-0"
+          className="flex items-center justify-center gap-2 flex-shrink-0 rounded-xl md:w-full mt-1"
           style={{
-            width: 44,
+            width: undefined,
+            minWidth: 44,
             height: 44,
-            borderRadius: 22,
-            border: "1.5px dashed rgba(255,255,255,0.5)",
+            border: "1.5px dashed rgba(255,255,255,0.45)",
             color: "rgba(255,255,255,0.85)",
             fontWeight: 900,
-            fontSize: 16,
+            fontSize: 14,
             background: "transparent",
           }}
         >
-          ＋
+          ＋<span className="hidden md:inline" style={{ fontFamily: MARU, fontSize: 12 }}>専門家を採用</span>
         </button>
 
         <div className="flex-1" />
@@ -426,26 +469,28 @@ export default function OfficeApp({
           onClick={() => setShowHistory(true)}
           title="依頼履歴"
           aria-label="依頼履歴を開く"
-          className="relative flex-shrink-0"
+          className="relative flex items-center justify-center md:justify-start gap-2 flex-shrink-0 rounded-xl md:w-full md:px-2"
           style={{
-            width: 40,
+            minWidth: 40,
             height: 40,
-            borderRadius: 12,
             background: "rgba(255,255,255,0.08)",
             color: "#F2F6FF",
             fontSize: 15,
           }}
         >
           🕘
+          <span className="hidden md:inline" style={{ fontFamily: MARU, fontSize: 12, fontWeight: 700 }}>
+            依頼履歴
+          </span>
           {history.entries.length > 0 && (
             <span
-              className="absolute -top-1 -right-1"
+              className="absolute -top-1 -right-1 md:static md:ml-auto"
               style={{
                 background: "#F2F6FF",
                 color: NAVY,
                 borderRadius: 8,
-                padding: "0 5px",
-                fontSize: 9,
+                padding: "0 6px",
+                fontSize: 9.5,
                 fontWeight: 900,
               }}
             >
@@ -457,11 +502,10 @@ export default function OfficeApp({
           onClick={logout}
           title="ログアウト"
           aria-label="ログアウト"
-          className="flex-shrink-0"
+          className="flex items-center justify-center md:justify-start gap-2 flex-shrink-0 rounded-xl md:w-full md:px-2"
           style={{
-            width: 40,
+            minWidth: 40,
             height: 40,
-            borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.3)",
             color: "rgba(255,255,255,0.8)",
             fontSize: 13,
@@ -469,6 +513,9 @@ export default function OfficeApp({
           }}
         >
           ⏻
+          <span className="hidden md:inline" style={{ fontFamily: MARU, fontSize: 12, fontWeight: 700 }}>
+            ログアウト
+          </span>
         </button>
       </aside>
 
