@@ -1,15 +1,17 @@
-/* ---------- カラーパレット (明るいオフィス / v3準拠) ---------- */
-export const BG = "#F4F2EB"; // 壁: 温かみのある紙白
-export const CARD = "#FFFFFF"; // デスク・カード
-export const FIELD = "#F7F5EF"; // 入力フィールド
-export const LINE = "#E3DFD3"; // 罫線
-export const TEXT = "#26334D"; // ネイビーインク
-export const MUTED = "#66738A"; // 補助テキスト
-export const BLUE = "#2E5FD8"; // ZERO ONEブルー (アクション)
-export const CHIP = "#E8EFFC"; // 淡青チップ
-export const NAVY = "#14263E"; // ブランドネイビー (ロゴ・線画)
-export const WOOD = "#C9A87C"; // デスクの木目アクセント
-export const RED = "#DF5240"; // 赤ペン・押印
+/* ---------- カラーパレット (ダークオフィス / v4 ダッシュボード準拠) ----------
+   参考: エージェント・ダッシュボードのモック (黒鉄色のパネル + 青のアクション)。
+   既存コンポーネントは全てこの定数を参照しているため、ここを変えると全体が切り替わる。 */
+export const BG = "#171C24"; // アプリ背景 (黒鉄色)
+export const CARD = "#222A35"; // パネル・カード
+export const FIELD = "#1A2029"; // 入力フィールド
+export const LINE = "#333D4B"; // 罫線
+export const TEXT = "#EEF2F7"; // 本文 (白)
+export const MUTED = "#98A4B5"; // 補助テキスト
+export const BLUE = "#3B7BF6"; // アクション (青)
+export const CHIP = "#2A3A55"; // 青みのチップ
+export const NAVY = "#0F131A"; // 最暗色 (左レール・バッジ)
+export const WOOD = "#C9A87C"; // アクセント (旧デスク木目・現在は未使用)
+export const RED = "#F0625A"; // エラー
 
 export const MARU = "'Zen Maru Gothic','Noto Sans JP',sans-serif"; // 見出し・名前用
 export const BODY =

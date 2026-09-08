@@ -1,9 +1,8 @@
 "use client";
 import { useState } from "react";
 import { motion } from "framer-motion";
-import Frenchie from "@/components/avatars/Frenchie";
 import { createClient } from "@/lib/supabase/client";
-import { BG, BLUE, CARD, FIELD, LINE, MARU, MUTED, NAVY, TEXT } from "@/lib/theme";
+import { BG, BLUE, CARD, FIELD, LINE, MARU, MUTED, TEXT } from "@/lib/theme";
 
 /* ---------- ログイン (メールのマジックリンク + Google) ----------
    受付のフレブルが出迎える小さなエントランス。 */
@@ -53,7 +52,7 @@ export default function LoginPage() {
       className="min-h-screen flex items-center justify-center p-4"
       style={{
         background: BG,
-        backgroundImage: "radial-gradient(#E5E1D4 1px, transparent 1px)",
+        backgroundImage: "radial-gradient(#26303C 1px, transparent 1px)",
         backgroundSize: "22px 22px",
         color: TEXT,
       }}
@@ -63,14 +62,14 @@ export default function LoginPage() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ type: "spring", stiffness: 280, damping: 24 }}
         className="w-full max-w-sm rounded-2xl p-6 flex flex-col items-center"
-        style={{ background: CARD, border: `1px solid ${LINE}`, boxShadow: "0 8px 30px rgba(20,38,62,0.10)" }}
+        style={{ background: CARD, border: `1px solid ${LINE}`, boxShadow: "0 8px 30px rgba(0,0,0,0.45)" }}
       >
         <div
           className="flex items-stretch mb-4"
           style={{ fontWeight: 900, fontSize: 14, fontStyle: "italic", letterSpacing: 1, fontFamily: MARU }}
         >
-          <span style={{ background: NAVY, color: "#FFF", padding: "2px 8px" }}>BUHI</span>
-          <span style={{ background: "transparent", color: NAVY, padding: "2px 8px", border: `2px solid ${NAVY}` }}>
+          <span style={{ background: BLUE, color: "#FFF", padding: "2px 8px" }}>BUHI</span>
+          <span style={{ background: "transparent", color: TEXT, padding: "2px 8px", border: `2px solid ${TEXT}` }}>
             WORKS
           </span>
         </div>
@@ -79,7 +78,19 @@ export default function LoginPage() {
           animate={{ y: [0, -3, 0] }}
           transition={{ repeat: Infinity, duration: 2.4, ease: "easeInOut" }}
         >
-          <Frenchie coat="white" accessory="glasses" size={92} />
+          <div
+            style={{
+              width: 96,
+              height: 96,
+              borderRadius: "50%",
+              overflow: "hidden",
+              border: `2px solid ${LINE}`,
+              boxShadow: "0 0 0 4px rgba(59,123,246,0.18)",
+            }}
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/milk/photo/idle.jpg" alt="ミルク" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+          </div>
         </motion.div>
 
         <div style={{ fontSize: 16, fontWeight: 900, fontFamily: MARU, marginTop: 8 }}>
@@ -92,7 +103,7 @@ export default function LoginPage() {
         {status === "sent" ? (
           <div
             className="w-full mt-5 px-4 py-3 rounded-xl text-center"
-            style={{ background: "#EAF4EA", border: "1px solid #C6E0C6", fontSize: 13, lineHeight: 1.7 }}
+            style={{ background: "#22362C", border: "1px solid #2F5A3F", fontSize: 13, lineHeight: 1.7 }}
           >
             📮 <b>{email}</b> にリンクを送りました。
             <br />
@@ -116,8 +127,8 @@ export default function LoginPage() {
               disabled={!email.trim() || status === "sending"}
               className="w-full py-2.5 rounded-lg mt-2"
               style={{
-                background: !email.trim() || status === "sending" ? "#D6D9E0" : BLUE,
-                color: !email.trim() || status === "sending" ? "#8B94A6" : "#FFF",
+                background: !email.trim() || status === "sending" ? "#2C3541" : BLUE,
+                color: !email.trim() || status === "sending" ? "#6F7C8F" : "#FFF",
                 fontWeight: 900,
                 fontSize: 14,
               }}
@@ -142,7 +153,7 @@ export default function LoginPage() {
         )}
 
         {status === "error" && (
-          <div className="w-full mt-3 px-3 py-2 rounded-lg" style={{ background: "#FBEBE8", border: "1px solid #EDC2BA", color: "#A9331F", fontSize: 12 }}>
+          <div className="w-full mt-3 px-3 py-2 rounded-lg" style={{ background: "#3A2A2C", border: "1px solid #6B3B3B", color: "#FFB4AE", fontSize: 12 }}>
             {errMsg}
           </div>
         )}

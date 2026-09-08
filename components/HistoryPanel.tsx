@@ -95,9 +95,9 @@ export default function HistoryPanel({
 
   const statusChip = (s: HistoryEntry["status"]) =>
     s === "waiting"
-      ? { label: "対応中", color: "#8A6D1D", bg: "#FBF3D9" }
+      ? { label: "対応中", color: "#FFD37F", bg: "#3A3322" }
       : s === "error"
-        ? { label: "エラー", color: RED, bg: "#FBE4E4" }
+        ? { label: "エラー", color: RED, bg: "#3A2A2C" }
         : { label: "完了", color: BLUE, bg: CHIP };
 
   return (
@@ -110,7 +110,7 @@ export default function HistoryPanel({
       {/* 背景 */}
       <motion.div
         className="absolute inset-0"
-        style={{ background: "rgba(20,28,46,0.42)" }}
+        style={{ background: "rgba(0,0,0,0.55)" }}
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2 }}
@@ -123,7 +123,7 @@ export default function HistoryPanel({
         style={{
           background: CARD,
           maxHeight: "92dvh",
-          boxShadow: "0 -8px 40px rgba(20,38,62,0.25)",
+          boxShadow: "0 -8px 40px rgba(0,0,0,0.5)",
         }}
         initial={{ opacity: 0, y: 48 }}
         animate={{ opacity: 1, y: 0 }}
@@ -133,7 +133,7 @@ export default function HistoryPanel({
         {/* ドラッグハンドル (モバイルのみ) */}
         <div
           className="sm:hidden mx-auto mt-2 rounded-full flex-shrink-0"
-          style={{ width: 44, height: 6, background: "rgba(20,38,62,0.18)" }}
+          style={{ width: 44, height: 6, background: "rgba(255,255,255,0.18)" }}
         />
 
         {/* ---------- ヘッダー: 案内役 + タイトル + 閉じる ---------- */}
@@ -376,7 +376,7 @@ export default function HistoryPanel({
                             key={i}
                             title={nm}
                             className="px-1.5 py-0.5 rounded"
-                            style={{ fontSize: 9.5, background: "#F1EEE4", color: MUTED }}
+                            style={{ fontSize: 9.5, background: "#2C3541", color: MUTED }}
                           >
                             📎 {nm}
                           </span>

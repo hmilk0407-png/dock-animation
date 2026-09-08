@@ -37,7 +37,7 @@ export default function ChatThread({
                       <span
                         key={a.id}
                         className="px-2 py-1 rounded-full"
-                        style={{ background: CHIP, border: "1px solid #D3E0F7", fontSize: 11, color: TEXT }}
+                        style={{ background: CHIP, border: "1px solid #3A4E75", fontSize: 11, color: TEXT }}
                       >
                         {attIcon(a)} {a.name}
                       </span>
@@ -69,7 +69,7 @@ export default function ChatThread({
             <div key={i} className="flex justify-center my-2">
               <div
                 className="px-3 py-1 rounded-full flex items-center gap-1"
-                style={{ background: CHIP, color: BLUE, fontSize: 11, fontWeight: 700, border: "1px solid #D3E0F7" }}
+                style={{ background: CHIP, color: BLUE, fontSize: 11, fontWeight: 700, border: "1px solid #3A4E75" }}
               >
                 {[0, 0.15, 0.3].map((d) => (
                   <motion.span
@@ -93,7 +93,7 @@ export default function ChatThread({
             <div
               key={i}
               className="my-3 px-4 py-3 rounded-xl"
-              style={{ background: "#FBEBE8", border: "1px solid #EDC2BA", color: "#A9331F", fontSize: 13 }}
+              style={{ background: "#3A2A2C", border: "1px solid #6B3B3B", color: "#FFB4AE", fontSize: 13 }}
             >
               {m.text}
             </div>
@@ -116,7 +116,7 @@ export default function ChatThread({
                   fontSize: 14,
                   lineHeight: 1.8,
                   borderTopLeftRadius: 4,
-                  boxShadow: "0 1px 4px rgba(20,38,62,0.06)",
+                  boxShadow: "0 1px 4px rgba(0,0,0,0.25)",
                 }}
               >
                 <Markdown text={m.text} />
@@ -129,7 +129,7 @@ export default function ChatThread({
       {phase !== "idle" && workingExpert && (
         <div
           className="flex gap-3 my-3 items-center p-3 rounded-2xl"
-          style={{ background: CARD, border: `1px solid ${LINE}`, boxShadow: "0 1px 4px rgba(20,38,62,0.06)" }}
+          style={{ background: CARD, border: `1px solid ${LINE}`, boxShadow: "0 1px 4px rgba(0,0,0,0.25)" }}
         >
           <motion.div {...pop} className="flex-shrink-0">
             <Avatar expert={workingExpert} size={76} working />

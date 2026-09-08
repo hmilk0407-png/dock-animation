@@ -6,8 +6,8 @@ import { BG } from "@/lib/theme";
 import type { Attachment } from "@/lib/types";
 
 /* Header / Dock と揃えた近未来配色 */
-const BASE_1 = "#0E1B3E";
-const BASE_3 = "#0A1230";
+const BASE_1 = "#1A2029";
+const BASE_3 = "#161B23";
 const ICE = "#F2F6FF";
 const GLOW = "#7FA8FF";
 
@@ -71,7 +71,7 @@ const Composer = forwardRef<
           className="flex flex-col p-2 rounded-2xl"
           style={{
             background: `linear-gradient(160deg, ${BASE_1} 0%, ${BASE_3} 100%)`,
-            border: "1px solid rgba(127,168,255,0.35)",
+            border: "1px solid rgba(127,168,255,0.28)",
             boxShadow: "0 4px 18px rgba(4,10,28,0.35), 0 0 0 1px rgba(46,95,216,0.15)",
           }}
         >

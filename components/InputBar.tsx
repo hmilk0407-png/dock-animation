@@ -107,7 +107,7 @@ const InputBar = forwardRef<HTMLTextAreaElement, InputBarProps>(
         style={{
           background: CARD,
           border: `1px solid ${LINE}`,
-          boxShadow: "0 2px 10px rgba(20,38,62,0.08)",
+          boxShadow: "0 2px 10px rgba(0,0,0,0.3)",
         }}
       >
         <div className="flex items-end gap-2">
@@ -144,8 +144,8 @@ const InputBar = forwardRef<HTMLTextAreaElement, InputBarProps>(
             aria-label="依頼を送信"
             className="px-4 py-2 rounded-lg flex-shrink-0"
             style={{
-              background: sendDisabled ? "#D6D9E0" : BLUE,
-              color: sendDisabled ? "#8B94A6" : "#FFFFFF",
+              background: sendDisabled ? "#2C3541" : BLUE,
+              color: sendDisabled ? "#6F7C8F" : "#FFFFFF",
               fontWeight: 700,
               fontSize: 14,
               boxShadow: sendDisabled ? "none" : "0 2px 10px rgba(46,95,216,0.30)",

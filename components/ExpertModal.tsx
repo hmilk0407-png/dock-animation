@@ -140,7 +140,7 @@ export default function ExpertModal({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 flex items-end sm:items-center justify-center p-3"
-      style={{ background: "rgba(20,38,62,0.45)", zIndex: 50 }}
+      style={{ background: "rgba(0,0,0,0.6)", zIndex: 50 }}
       onClick={onClose}
     >
       <motion.div
@@ -152,7 +152,7 @@ export default function ExpertModal({
         style={{
           background: CARD,
           border: `1px solid ${LINE}`,
-          boxShadow: "0 12px 40px rgba(20,38,62,0.30)",
+          boxShadow: "0 12px 40px rgba(0,0,0,0.55)",
           maxHeight: "90vh",
           color: TEXT,
         }}
@@ -170,7 +170,7 @@ export default function ExpertModal({
         {/* プロフィール + 写真設定 */}
         <div className="flex items-center gap-3 mb-3 p-3 rounded-xl" style={{ background: FIELD, border: `1.5px dashed ${BLUE}` }}>
           {previewSrc ? (
-            <div style={{ width: 64, height: 64, borderRadius: "24%", overflow: "hidden", border: `1.5px solid ${LINE}`, background: "#EDEAE0", flexShrink: 0 }}>
+            <div style={{ width: 64, height: 64, borderRadius: "24%", overflow: "hidden", border: `1.5px solid ${LINE}`, background: "#2C3541", flexShrink: 0 }}>
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={previewSrc} alt={name || "専門家"} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} draggable={false} />
             </div>
@@ -195,14 +195,14 @@ export default function ExpertModal({
                     setPhotoStatus("保存すると既定の画像に戻ります");
                   }}
                   className="px-2 py-1 rounded-full"
-                  style={{ fontSize: 11, fontWeight: 700, color: "#A9331F", background: "#FBEBE8" }}
+                  style={{ fontSize: 11, fontWeight: 700, color: "#FFB4AE", background: "#3A2A2C" }}
                 >
                   写真を削除
                 </button>
               )}
             </div>
             {photoStatus && (
-              <div style={{ fontSize: 10, color: photoStatus.includes("できません") ? "#A9331F" : BLUE, fontWeight: 700, marginTop: 3 }}>
+              <div style={{ fontSize: 10, color: photoStatus.includes("できません") ? "#FFB4AE" : BLUE, fontWeight: 700, marginTop: 3 }}>
                 {photoStatus}
               </div>
             )}
@@ -252,7 +252,7 @@ export default function ExpertModal({
           style={{ background: FIELD, border: `1px solid ${LINE}`, fontSize: 13, fontFamily: "inherit", lineHeight: 1.7, color: TEXT }}
         />
         {fileStatus && (
-          <div style={{ fontSize: 11, color: fileStatus.includes("読み込めません") ? "#A9331F" : BLUE, fontWeight: 700, marginTop: 2 }}>
+          <div style={{ fontSize: 11, color: fileStatus.includes("読み込めません") ? "#FFB4AE" : BLUE, fontWeight: 700, marginTop: 2 }}>
             {fileStatus}
           </div>
         )}
@@ -303,8 +303,8 @@ export default function ExpertModal({
           disabled={!valid}
           className="w-full py-3 rounded-lg mt-2"
           style={{
-            background: valid ? BLUE : "#D6D9E0",
-            color: valid ? "#FFF" : "#8B94A6",
+            background: valid ? BLUE : "#2C3541",
+            color: valid ? "#FFF" : "#6F7C8F",
             fontWeight: 900,
             fontSize: 15,
             boxShadow: valid ? "0 2px 10px rgba(46,95,216,0.30)" : "none",

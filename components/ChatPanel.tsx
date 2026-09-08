@@ -8,7 +8,7 @@ import Avatar from "./avatars/Avatar";
 import { fileToAttachment } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
 import { SECRETARY_SLUG } from "@/lib/experts";
-import { BG, MARU, MUTED } from "@/lib/theme";
+import { CARD, MARU, MUTED } from "@/lib/theme";
 import type { Attachment, ChatMessage, Expert } from "@/lib/types";
 import type { DockEvent } from "@/lib/dock/DockState";
 
@@ -189,8 +189,8 @@ export default function ChatPanel({
       <main
         className="flex-1 overflow-y-auto px-4 py-4 buhi-scroll"
         style={{
-          background: BG,
-          backgroundImage: "radial-gradient(#E5E1D4 1px, transparent 1px)",
+          background: CARD,
+          backgroundImage: "radial-gradient(#2A3340 1px, transparent 1px)",
           backgroundSize: "22px 22px",
           paddingBottom: "calc(24px + env(safe-area-inset-bottom))",
         }}

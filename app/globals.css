@@ -11,8 +11,8 @@
    ============================================================ */
 
 :root {
-  --bg: #f4f2eb;
-  --text: #26334d;
+  --bg: #171c24;
+  --text: #eef2f7;
 }
 
 html,
@@ -324,10 +324,10 @@ button {
   width: 6px;
 }
 .buhi-scroll::-webkit-scrollbar-thumb {
-  background: #d8d3c6;
+  background: #3a4552;
   border-radius: 3px;
 }
 textarea::placeholder,
 input::placeholder {
-  color: #9aa5b8;
+  color: #6f7c8f;
 }

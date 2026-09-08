@@ -55,7 +55,7 @@ export default function Markdown({ text }: { text: string }) {
         <pre
           key={key++}
           style={{
-            background: "#F1EFE7",
+            background: "#1A2029",
             border: `1px solid ${LINE}`,
             color: TEXT,
             borderRadius: 8,
@@ -170,7 +170,7 @@ export default function Markdown({ text }: { text: string }) {
         <div key={key++} style={{ margin: "4px 0" }}>
           {items.map((it, ii) => (
             <div key={ii} style={{ display: "flex", gap: 6, margin: "2px 0" }}>
-              <span style={{ color: "#2E5FD8", fontWeight: 700, flexShrink: 0 }}>{it.marker}</span>
+              <span style={{ color: "#7FA8FF", fontWeight: 700, flexShrink: 0 }}>{it.marker}</span>
               <span>{renderInline(it.body, `li${key}-${ii}`)}</span>
             </div>
           ))}

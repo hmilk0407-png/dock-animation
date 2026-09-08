@@ -38,8 +38,8 @@ export default function Avatar({
             borderRadius: "24%",
             overflow: "hidden",
             border: `1.5px solid ${LINE}`,
-            background: "#EDEAE0",
-            boxShadow: "0 1px 3px rgba(20,38,62,0.10)",
+            background: "#2C3541",
+            boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
           }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -84,10 +84,10 @@ export function MoodBadge({ entry, size = 17 }: { entry: HistoryEntry; size?: nu
         bottom: -5,
         width: size,
         height: size,
-        background: "#FFF",
+        background: "#F2F6FF",
         border: `1px solid ${LINE}`,
         borderRadius: "50%",
-        boxShadow: "0 1px 3px rgba(20,38,62,0.15)",
+        boxShadow: "0 1px 3px rgba(0,0,0,0.35)",
       }}
     >
       <svg width={size - 3} height={size - 3} viewBox="0 0 20 20" style={{ overflow: "visible" }}>
