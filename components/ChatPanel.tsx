@@ -43,6 +43,8 @@ export default function ChatPanel({
   onDockEvent,
   reuseText = null,
   announcement = null,
+  resetSignal = null,
+  loadThread = null,
   className = "flex flex-col h-full min-h-0",
 }: {
   /** 専門家名簿 (受付 secretary の表示・空状態あいさつに使用) */
@@ -57,6 +59,10 @@ export default function ChatPanel({
   reuseText?: { text: string; ts: number } | null;
   /** 受付ミルクからのお知らせ (朝の予定読み上げ等): ts が変わるたび吹き出しを追加 */
   announcement?: { text: string; ts: number } | null;
+  /** 「新しい依頼」: ts が変わるたび吹き出し・入力・添付をすべて空にする */
+  resetSignal?: { ts: number } | null;
+  /** 履歴から会話を再開: ts が変わるたび messages で吹き出しを置き換え、入力欄へフォーカス */
+  loadThread?: { messages: ChatMessage[]; ts: number } | null;
   /** 外枠のクラス (省略時は親いっぱいの縦フレックス) */
   className?: string;
 }) {
@@ -87,6 +93,24 @@ export default function ChatPanel({
     setInput(reuseText.text);
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [reuseText?.ts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 新しい依頼: 会話をまっさらにする (履歴はDBに残っているので消えない) */
+  useEffect(() => {
+    if (!resetSignal) return;
+    setMessages([]);
+    setInput("");
+    setAttachments([]);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [resetSignal?.ts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* 履歴から会話を再開: 保存済みのやり取りを吹き出しとして復元 */
+  useEffect(() => {
+    if (!loadThread) return;
+    setMessages(loadThread.messages);
+    setInput("");
+    setAttachments([]);
+    setTimeout(() => inputRef.current?.focus(), 0);
+  }, [loadThread?.ts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* お知らせ (朝の予定など): ミルクの吹き出しとして追加 */
   useEffect(() => {

@@ -5,6 +5,7 @@ import type { HistoryEntry } from "@/lib/types";
 
 export const MAX_HISTORY = 200; // 表示・保持の上限 (古い順に自動削除)
 export const MAX_REQ_CHARS = 2000; // 依頼本文の保存上限文字数
+export const MAX_RES_CHARS = 30000; // 回答全文の保存上限文字数
 
 /* ---------- 依頼履歴ストア (Supabase版) ----------
    v3の window.storage 実装を requests テーブルに置き換えたもの。
@@ -34,10 +35,13 @@ export function useHistory() {
     specialty: string;
     requestText: string;
     attachments: string[];
+    /** 会話のまとまり (OfficeApp が採番・保持する) */
+    threadId: string;
   }): Promise<string | null> {
     const { data, error } = await supabase
       .from("requests")
       .insert({
+        thread_id: input.threadId,
         expert_slug: input.expertSlug,
         expert_name: input.expertName,
         specialty: input.specialty,
@@ -75,9 +79,26 @@ export function useHistory() {
   }
 
   async function updateEntry(id: string, patch: Partial<HistoryEntry>) {
+    if (typeof patch.response_text === "string") {
+      patch = { ...patch, response_text: patch.response_text.slice(0, MAX_RES_CHARS) };
+    }
     setEntries((prev) => prev.map((e) => (e.id === id ? { ...e, ...patch } : e)));
     const { error } = await supabase.from("requests").update(patch).eq("id", id);
     if (error) console.error("履歴の更新に失敗しました", error);
+  }
+
+  /** 会話の再開用: 同じ thread_id の依頼を古い順に取得する (回答全文つき) */
+  async function loadThread(threadId: string): Promise<HistoryEntry[]> {
+    const { data, error } = await supabase
+      .from("requests")
+      .select("*")
+      .eq("thread_id", threadId)
+      .order("requested_at", { ascending: true });
+    if (error) {
+      console.error("会話の読み込みに失敗しました", error);
+      return [];
+    }
+    return (data || []) as HistoryEntry[];
   }
 
   async function removeEntry(id: string) {
@@ -93,7 +114,7 @@ export function useHistory() {
       .gte("requested_at", "1970-01-01T00:00:00Z");
   }
 
-  return { entries, loaded, addEntry, updateEntry, removeEntry, clearAll };
+  return { entries, loaded, addEntry, updateEntry, removeEntry, clearAll, loadThread };
 }
 
 export function fmtDateTime(iso: string): string {

@@ -6,7 +6,7 @@ import { BLUE, CARD, FIELD, LINE, MUTED, TEXT } from "@/lib/theme";
 /* ============================================================
    InputBar — 汎用の入力欄コンポーネント
    - textarea 自動リサイズ (minHeight〜maxHeight、超過分はスクロール)
-   - 送信ボタン (Cmd/Ctrl + Enter でも送信)
+   - 送信ボタン (Enter でも送信。Shift+Enter は改行。IME変換中の Enter は無視)
    - 入力中ドットアニメーション:
        * ユーザーがタイプしている間「● ● ● 入力中」を表示 (1.1秒無操作で消灯)
        * busy=true の間は busyLabel 付きでドットを表示し送信を無効化
@@ -42,7 +42,7 @@ const InputBar = forwardRef<HTMLTextAreaElement, InputBarProps>(
       disabled = false,
       busy = false,
       busyLabel = "対応中",
-      placeholder = "依頼内容を入力（Ctrl+Enterで送信）",
+      placeholder = "依頼内容を入力（Enterで送信・Shift+Enterで改行）",
       sendLabel = "依頼",
       minHeight = 80,
       maxHeight = 240,
@@ -120,10 +120,11 @@ const InputBar = forwardRef<HTMLTextAreaElement, InputBarProps>(
             value={val}
             onChange={(e) => setVal(e.target.value)}
             onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                e.preventDefault();
-                send();
-              }
+              if (e.key !== "Enter") return;
+              if (e.nativeEvent.isComposing || e.keyCode === 229) return; // IME変換確定
+              if (e.shiftKey) return; // 改行
+              e.preventDefault();
+              send();
             }}
             placeholder={placeholder}
             rows={1}

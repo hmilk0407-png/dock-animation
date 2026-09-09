@@ -18,6 +18,7 @@ import { createClient } from "@/lib/supabase/client";
 import { BG, BLUE, CARD, CHIP, LINE, MARU, MUTED, NAVY, RED, TEXT } from "@/lib/theme";
 import type {
   Attachment,
+  ChatMessage,
   ContentBlock,
   Expert,
   HistoryEntry,
@@ -42,6 +43,23 @@ function kindFromName(n: string): "image" | "pdf" | "text" {
   return "text";
 }
 
+/* 履歴行→専門家: 名簿に居れば実物、削除済みなら履歴の情報から仮の姿を作る */
+function expertFromEntry(experts: Expert[], e: HistoryEntry): Expert {
+  return (
+    experts.find((x) => x.slug === e.expert_slug) || {
+      id: e.expert_slug,
+      slug: e.expert_slug,
+      name: e.expert_name,
+      specialty: e.specialty,
+      prompt: "",
+      coat: "bluegray",
+      accessory: "none",
+      isDefault: false,
+      photoUrl: null,
+      sortOrder: 999,
+    }
+  );
+}
 
 /* ---------- エージェントパネル: 状態表示ラベル ---------- */
 const AGENT_TASK: Record<DockState, string> = {
@@ -103,6 +121,10 @@ const MILK_PHOTO: MilkManifest = {
    - 履歴ストア(useHistory ※useHistoryStore相当)と連動:
        担当決定時に waiting で登録 → 回答完了で done / 失敗で error に更新
    - 履歴の↺再依頼: reuseText を ChatPanel へ渡し InputBar に初期値をセット
+   - 会話のまとまり(スレッド): threadIdRef で管理。
+       「新しい依頼」→ threadId を捨てて文脈・吹き出しをリセット (次の送信で再採番)
+       履歴の「続きを依頼」→ 同じ thread_id の依頼/回答を読み直して復元し、
+       以降の依頼は同じ thread_id で保存される
    - 担当切替時: dockAck シグナルで該当カードが一跳ねする (Framer Motion)
    - 現在担当(currentExpert)・指名(pinnedSlug)・busy を state で管理
    ============================================================ */
@@ -142,6 +164,14 @@ export default function OfficeApp({
 
   /** 会話文脈: ChatPanelは表示専任のため、送受信テキストを親側で保持して回答APIへ同送 */
   const turnsRef = useRef<PlainTurn[]>([]);
+  /** 現在の会話(スレッド)ID。null のときは次の送信で新しく採番する */
+  const threadIdRef = useRef<string | null>(null);
+  /** 「新しい依頼」: ChatPanel の吹き出し・入力を空にするシグナル */
+  const [resetSignal, setResetSignal] = useState<{ ts: number } | null>(null);
+  /** 履歴からの再開: ChatPanel に復元する吹き出し */
+  const [loadThread, setLoadThread] = useState<{ messages: ChatMessage[]; ts: number } | null>(null);
+  /** 会話の読み込み中 (履歴→続きを依頼) */
+  const [resuming, setResuming] = useState(false);
 
   const secretary =
     experts.find((e) => e.slug === SECRETARY_SLUG) || experts[0] || null;
@@ -177,6 +207,9 @@ export default function OfficeApp({
     dock.trigger({ type: "api:start" });
     setCurrentExpert(pinnedExpert || secretary);
     let historyId: string | null = null;
+    /* 会話ID: 未採番なら新規。以降この会話の依頼は同じIDで保存される */
+    if (!threadIdRef.current) threadIdRef.current = crypto.randomUUID();
+    const threadId = threadIdRef.current;
 
     try {
       /* 1. 担当決定 (指名中は受付を通さず直行) */
@@ -208,6 +241,7 @@ export default function OfficeApp({
         specialty: expert.specialty,
         requestText: text,
         attachments: allAttachUrls,
+        threadId,
       });
 
       /* 3. 回答生成 (添付をブロック化し、直近12ターンの文脈と同送)
@@ -268,10 +302,11 @@ export default function OfficeApp({
       if (!answerRes.ok) throw new Error(answerData.error || "回答生成に失敗しました");
       const answer: string = answerData.text || "";
 
-      /* 4. 履歴: waiting → done */
+      /* 4. 履歴: waiting → done (回答全文も保存し、後から会話を再開できるようにする) */
       if (historyId) {
         void history.updateEntry(historyId, {
           response_preview: answer.replace(/\s+/g, " ").slice(0, 120),
+          response_text: answer,
           status: "done",
         });
       }
@@ -311,6 +346,71 @@ export default function OfficeApp({
     setReuseText({ text, ts: Date.now() });
     setReuseAttachUrls(entry ? entry.attachments : []);
     if (entry) setDockAck({ expertSlug: entry.expert_slug, ts: Date.now() });
+  }
+
+  /* ---------- 新しい依頼: 会話を切り替える (履歴は残る) ---------- */
+  function handleNewChat() {
+    if (busy || resuming) return;
+    threadIdRef.current = null;
+    turnsRef.current = [];
+    setCurrentExpert(null);
+    setReuseAttachUrls([]);
+    setResetSignal({ ts: Date.now() });
+  }
+
+  /* ---------- 履歴の「続きを依頼」: 同じ会話の依頼/回答を復元して再開 ---------- */
+  async function handleResume(entry: HistoryEntry) {
+    if (busy || resuming) return;
+    setShowHistory(false);
+    setResuming(true);
+    try {
+      let rows = await history.loadThread(entry.thread_id);
+      if (rows.length === 0) rows = [entry];
+
+      const messages: ChatMessage[] = [];
+      const turns: PlainTurn[] = [];
+      let lastExpert: Expert | null = null;
+      for (const r of rows) {
+        const expert = expertFromEntry(experts, r);
+        lastExpert = expert;
+        messages.push({
+          role: "user",
+          text: r.request_text,
+          attachments: r.attachments.map((u, i) => {
+            const name = nameFromUrl(u);
+            return { id: `hist-${r.id}-${i}`, name, kind: kindFromName(name), url: u };
+          }),
+        });
+        messages.push({ role: "route", expert, note: "" });
+        if (r.status === "error") {
+          messages.push({ role: "error", text: r.response_preview || "（通信エラーで中断）" });
+          continue;
+        }
+        if (r.status === "waiting") {
+          messages.push({ role: "error", text: "（この依頼は回答が記録されていません）" });
+          continue;
+        }
+        /* 回答全文があれば復元。無い(=機能追加前の記録)場合は要約だけ表示する */
+        const answer =
+          r.response_text ||
+          (r.response_preview
+            ? `${r.response_preview}…\n\n（この回答は要約のみ保存されています）`
+            : "（回答は保存されていません）");
+        messages.push({ role: "assistant", expert, text: answer });
+        turns.push({ role: "user", content: r.request_text });
+        turns.push({ role: "assistant", content: answer });
+      }
+
+      threadIdRef.current = entry.thread_id;
+      turnsRef.current = turns.slice(-24);
+      setReuseAttachUrls([]);
+      setCurrentExpert(lastExpert);
+      if (lastExpert) setDockAck({ expertSlug: lastExpert.slug, ts: Date.now() });
+      if (uiMode === "entrance") setUiMode("office");
+      setLoadThread({ messages, ts: Date.now() });
+    } finally {
+      setResuming(false);
+    }
   }
 
   function handleRemoveExpert(slug: string) {
@@ -711,6 +811,7 @@ export default function OfficeApp({
           <span style={{ fontFamily: MARU, fontWeight: 900, fontSize: 14, color: TEXT }}>
             エージェント・チャット
           </span>
+          <div className="flex items-center gap-2">
           {headerExpert && (
             <div
               className="flex items-center gap-1.5 px-2 py-1 rounded-full"
@@ -722,6 +823,26 @@ export default function OfficeApp({
               </span>
             </div>
           )}
+          <button
+            onClick={handleNewChat}
+            disabled={busy || resuming}
+            title="いまの会話を終えて、新しい依頼を始める（これまでの会話は依頼履歴に残ります）"
+            aria-label="新しい依頼を始める"
+            data-testid="new-chat"
+            className="flex items-center gap-1 px-2.5 py-1 rounded-full flex-shrink-0"
+            style={{
+              fontSize: 11,
+              fontWeight: 900,
+              fontFamily: MARU,
+              color: busy || resuming ? MUTED : BLUE,
+              border: `1.5px solid ${busy || resuming ? LINE : BLUE}`,
+              background: "transparent",
+              opacity: busy || resuming ? 0.6 : 1,
+            }}
+          >
+            ＋ 新しい依頼
+          </button>
+          </div>
         </div>
         <ChatPanel
           experts={experts}
@@ -729,6 +850,8 @@ export default function OfficeApp({
           onAttachMeta={handleAttachMeta}
           onDockEvent={dock.trigger}
           reuseText={reuseText}
+          resetSignal={resetSignal}
+          loadThread={loadThread}
           className="flex flex-col flex-1 min-h-0"
         />
       </section>
@@ -758,6 +881,7 @@ export default function OfficeApp({
           onRemove={(id) => void history.removeEntry(id)}
           onClearAll={() => void history.clearAll()}
           onReuse={handleReuse}
+          onResume={(entry) => void handleResume(entry)}
         />
       )}
 

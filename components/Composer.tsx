@@ -12,7 +12,22 @@ const ICE = "#F2F6FF";
 const GLOW = "#7FA8FF";
 
 /* ---------- 受付カウンター (入力欄) ----------
-   文字量に応じて自動で高さが広がる (min 80px / 上限なし)。Cmd/Ctrl+Enterで送信。 */
+   文字量に応じて自動で高さが広がる (min 80px / 上限なし)。
+   キー操作: Enter=送信 / Shift+Enter=改行 (Cmd/Ctrl+Enter でも送信)。
+   日本語IMEで変換中の Enter (isComposing / keyCode 229) は確定操作なので送信しない。 */
+
+/** Enter キー入力を「送信」と扱うかの判定 (テスト可能な純関数) */
+export function shouldSendOnEnter(e: {
+  key: string;
+  shiftKey: boolean;
+  keyCode?: number;
+  nativeEvent?: { isComposing?: boolean };
+}): boolean {
+  if (e.key !== "Enter") return false;
+  if (e.nativeEvent?.isComposing || e.keyCode === 229) return false; // IME変換確定
+  if (e.shiftKey) return false; // 改行
+  return true;
+}
 const Composer = forwardRef<
   HTMLTextAreaElement,
   {
@@ -178,9 +193,12 @@ const Composer = forwardRef<
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !disabled) onSend();
+                if (!shouldSendOnEnter(e)) return;
+                e.preventDefault(); // 送信時に改行を入れない (送信不可のときも空行を増やさない)
+                if (!disabled) onSend();
               }}
-              placeholder="依頼内容を入力（📎でデータや資料を添付できます）"
+              placeholder="依頼内容を入力（Enterで送信・Shift+Enterで改行・📎で添付）"
+              data-testid="composer-input"
               rows={1}
               className="flex-1 resize-none outline-none px-2 py-2 placeholder:text-[#8FA7DA]"
               style={{

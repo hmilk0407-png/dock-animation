@@ -66,6 +66,10 @@ export interface HistoryEntry {
   artifact_url: string | null;
   status: "waiting" | "done" | "error";
   requested_at: string;
+  /** 会話のまとまり。同じ会話の依頼は同じ値 (0004_threads.sql) */
+  thread_id: string;
+  /** 回答の全文 (履歴から会話を再開するときに復元する) */
+  response_text: string | null;
 }
 
 /** Anthropic Messages API のコンテンツブロック (クライアント→サーバー) */

@@ -17,6 +17,7 @@ import type { Expert, HistoryEntry } from "@/lib/types";
    - 個別削除(×) と 全削除 (それぞれ confirm 付き)
    - ↺再依頼: 担当キャラが一跳ね→「了解です！」→ 650ms後に
      onReuse(request_text, entry) で依頼本文を OfficeApp へ返す
+   - 💬続きを依頼: onResume(entry) で同じ会話(thread_id)を画面に復元し、追加依頼できる
    - キャラ反応は Framer Motion (案内役のあいさつ / 担当キャラのアック)
    - モバイルはボトムシート、sm以上は中央モーダルのレスポンシブ設計
    ============================================================ */
@@ -28,6 +29,7 @@ export default function HistoryPanel({
   onRemove,
   onClearAll,
   onReuse,
+  onResume,
   attachMeta = null,
   currentSlug = null,
 }: {
@@ -38,6 +40,8 @@ export default function HistoryPanel({
   onClearAll: () => void;
   /** ↺再依頼: 依頼本文を返す。entry は担当カード演出などの補助情報 */
   onReuse: (text: string, entry?: HistoryEntry) => void;
+  /** 💬続きを依頼: この履歴が属する会話を復元して再開する */
+  onResume: (entry: HistoryEntry) => void;
   /** Composer(onAttachMeta)から渡される現在の添付メタ情報 */
   attachMeta?: { count: number; names: string[]; kinds: string[] } | null;
   /** 現在担当の専門家slug (フィルタで先頭に並べて強調する) */
@@ -56,6 +60,9 @@ export default function HistoryPanel({
   ];
   const countOf = (slug: string) =>
     entries.filter((e) => e.expert_slug === slug).length;
+  /* 同じ会話に何件の依頼があるか (「続きを依頼」の説明に使う) */
+  const threadSize = (e: HistoryEntry) =>
+    entries.filter((x) => x.thread_id === e.thread_id).length;
 
   /* パネルの案内役: すべて=受付 / 絞り込み中=その専門家 */
   const featured =
@@ -79,6 +86,16 @@ export default function HistoryPanel({
     setTimeout(() => {
       setAckId(null);
       onReuse(entry.request_text, entry);
+    }, 650);
+  }
+
+  /* ---------- 💬続きを依頼: キャラ反応 → OfficeAppへ ---------- */
+  function handleResume(entry: HistoryEntry) {
+    if (ackId) return;
+    setAckId(entry.id);
+    setTimeout(() => {
+      setAckId(null);
+      onResume(entry);
     }, 650);
   }
 
@@ -400,14 +417,32 @@ export default function HistoryPanel({
                   )}
                 </div>
 
-                {/* アクション: ↺再依頼 / ×削除 */}
+                {/* アクション: 💬続きを依頼 / ↺再依頼 / ×削除 */}
                 <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+                  <motion.button
+                    whileTap={{ scale: 0.88 }}
+                    onClick={() => handleResume(e)}
+                    disabled={Boolean(ackId)}
+                    aria-label="この会話の続きを依頼する"
+                    title={`続きを依頼（この会話 ${threadSize(e)} 件のやり取りを画面に戻します）`}
+                    className="rounded-full flex items-center justify-center"
+                    style={{
+                      width: 30,
+                      height: 30,
+                      border: `1.5px solid ${BLUE}`,
+                      color: "#FFF",
+                      fontSize: 13,
+                      background: acking ? CHIP : BLUE,
+                    }}
+                  >
+                    💬
+                  </motion.button>
                   <motion.button
                     whileTap={{ scale: 0.88 }}
                     onClick={() => handleReuse(e)}
                     disabled={Boolean(ackId)}
                     aria-label="この内容で再依頼する"
-                    title="この内容で再依頼"
+                    title="同じ内容を入力欄に戻して再依頼（新しい会話にはなりません）"
                     className="rounded-full flex items-center justify-center"
                     style={{
                       width: 30,
