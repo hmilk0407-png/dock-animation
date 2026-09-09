@@ -8,7 +8,7 @@ import Avatar from "./avatars/Avatar";
 import { fileToAttachment } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
 import { SECRETARY_SLUG } from "@/lib/experts";
-import { CARD, MARU, MUTED } from "@/lib/theme";
+import { BG, MARU, MUTED } from "@/lib/theme";
 import type { Attachment, ChatMessage, Expert } from "@/lib/types";
 import type { DockEvent } from "@/lib/dock/DockState";
 
@@ -42,6 +42,7 @@ export default function ChatPanel({
   onAttachMeta,
   onDockEvent,
   reuseText = null,
+  announcement = null,
   className = "flex flex-col h-full min-h-0",
 }: {
   /** 専門家名簿 (受付 secretary の表示・空状態あいさつに使用) */
@@ -54,6 +55,8 @@ export default function ChatPanel({
   onDockEvent?: (event: DockEvent) => void;
   /** 履歴↺再依頼: ts が変わるたび text を InputBar に流し込みフォーカスする */
   reuseText?: { text: string; ts: number } | null;
+  /** 受付ミルクからのお知らせ (朝の予定読み上げ等): ts が変わるたび吹き出しを追加 */
+  announcement?: { text: string; ts: number } | null;
   /** 外枠のクラス (省略時は親いっぱいの縦フレックス) */
   className?: string;
 }) {
@@ -84,6 +87,15 @@ export default function ChatPanel({
     setInput(reuseText.text);
     setTimeout(() => inputRef.current?.focus(), 0);
   }, [reuseText?.ts]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* お知らせ (朝の予定など): ミルクの吹き出しとして追加 */
+  useEffect(() => {
+    if (!announcement || !announcement.text || !secretary) return;
+    setMessages((m) => [
+      ...m,
+      { role: "assistant", expert: secretary, text: announcement.text },
+    ]);
+  }, [announcement?.ts]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ---------- 入力イベント: input:start / (1.1s無操作で) input:stop ---------- */
   function handleInputChange(v: string) {
@@ -189,8 +201,8 @@ export default function ChatPanel({
       <main
         className="flex-1 overflow-y-auto px-4 py-4 buhi-scroll"
         style={{
-          background: CARD,
-          backgroundImage: "radial-gradient(#2A3340 1px, transparent 1px)",
+          background: BG,
+          backgroundImage: "radial-gradient(#E5E1D4 1px, transparent 1px)",
           backgroundSize: "22px 22px",
           paddingBottom: "calc(24px + env(safe-area-inset-bottom))",
         }}

@@ -2,6 +2,8 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { buildExpertSystem, callClaude, validateBlocks } from "@/lib/claude";
 import type { ContentBlock, PlainTurn } from "@/lib/types";
+import { SECRETARY_SLUG } from "@/lib/experts";
+import { eventsForPrompt, sanitizeEvents, todayJst } from "@/lib/calendar";
 
 export const maxDuration = 60;
 
@@ -53,8 +55,22 @@ export async function POST(req: Request) {
       );
     }
 
+    /* 受付ミルクには今日の予定 (Google カレンダー経由) を持たせる */
+    let system = buildExpertSystem(expert);
+    if (expertSlug === SECRETARY_SLUG) {
+      const day = todayJst();
+      const { data: cal } = await supabase
+        .from("calendar_days")
+        .select("events")
+        .eq("day", day)
+        .maybeSingle();
+      if (cal) {
+        system += `\n\n${eventsForPrompt(day, sanitizeEvents(cal.events))}`;
+      }
+    }
+
     const text = await callClaude({
-      system: buildExpertSystem(expert),
+      system,
       messages: [...history, { role: "user", content: blocks }],
       maxTokens: Number(process.env.ANTHROPIC_MAX_TOKENS || 2048),
     });
