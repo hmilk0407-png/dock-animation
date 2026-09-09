@@ -89,7 +89,7 @@ export default function LoginPage() {
             }}
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/milk/photo/idle.jpg" alt="ミルク" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
+            <img src="/milk/photo/idle.png" alt="ミルク" style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
           </div>
         </motion.div>
 

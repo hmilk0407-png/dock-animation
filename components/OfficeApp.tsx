@@ -7,14 +7,13 @@ import ChatPanel, { type ChatSendResult } from "./ChatPanel";
 import Entrance from "./Entrance";
 import ExpertModal from "./ExpertModal";
 import HistoryPanel from "./HistoryPanel";
-import MilkAnimation from "./MilkAnimation";
+import MilkAnimation, { type MilkManifest } from "./MilkAnimation";
 import Avatar from "./avatars/Avatar";
 import { useExperts } from "@/hooks/useExperts";
 import { useHistory } from "@/hooks/useHistory";
 import { DockState } from "@/lib/dock/DockState";
 import { useDockState } from "@/lib/dock/useDockState";
 import { SECRETARY_SLUG } from "@/lib/experts";
-import { todayJst } from "@/lib/calendar";
 import { createClient } from "@/lib/supabase/client";
 import { BG, BLUE, CARD, CHIP, LINE, MARU, MUTED, NAVY, RED, TEXT } from "@/lib/theme";
 import type {
@@ -68,6 +67,29 @@ const AGENT_STATUS: Record<DockState, { label: string; color: string }> = {
   [DockState.Transition]: { label: "切替中", color: MUTED },
 };
 
+/* ---------- ミルク本体: 写真版 (public/milk/photo/*.jpg) ----------
+   メイン画面のみ写真版に差し替える。/test/dock と E2E は従来の MILK_ASSETS
+   (Lottie/WebM/PNG連番) を使うため MilkAnimation 側は変更しない。
+   1フレームの pngseq として登録すると <img> がそのまま表示される。 */
+const photo = (name: string) => ({
+  kind: "pngseq" as const,
+  frames: [`/milk/photo/${name}.png`],
+  fps: 1,
+  loop: true,
+});
+/* 全状態とも背景なしの透過PNG (idle + 反応4種) */
+const MILK_PHOTO: MilkManifest = {
+  [DockState.Idle]: photo("idle"),
+  [DockState.Focus]: photo("idle"),
+  [DockState.Listening]: photo("idle"),
+  [DockState.Transition]: photo("idle"),
+  [DockState.Thinking]: photo("loading"),
+  [DockState.Loading]: photo("loading"),
+  [DockState.Success]: photo("success"),
+  [DockState.Error]: photo("error"),
+  [DockState.Surprised]: photo("surprised"),
+};
+
 /* ============================================================
    OfficeApp — BUHI WORKS メインオーケストレーション
    構成: Entrance(初回オーバーレイ) → 3カラム
@@ -117,8 +139,6 @@ export default function OfficeApp({
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingExpert, setEditingExpert] = useState<Expert | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  /** 受付ミルクのお知らせ (朝の予定読み上げ) → ChatPanel へ */
-  const [announcement, setAnnouncement] = useState<{ text: string; ts: number } | null>(null);
 
   /** 会話文脈: ChatPanelは表示専任のため、送受信テキストを親側で保持して回答APIへ同送 */
   const turnsRef = useRef<PlainTurn[]>([]);
@@ -135,39 +155,6 @@ export default function OfficeApp({
     const t = setTimeout(() => setDockAck(null), 900);
     return () => clearTimeout(t);
   }, [dockAck]);
-
-  /* ---------- 朝の予定読み上げ: その日オフィスに入った最初の1回だけ ----------
-     /api/calendar/today は Apps Script が届けた当日分を返す。
-     まだ届いていない (received=false) 場合は何も言わず、次回開いた時に再試行する。 */
-  useEffect(() => {
-    if (uiMode !== "office") return;
-    const key = `buhi:morning:${todayJst()}`;
-    try {
-      if (window.localStorage.getItem(key)) return;
-    } catch {
-      /* localStorage 不可の環境では毎回読み上げる */
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/calendar/today");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (cancelled || !data?.received || !data?.text) return;
-        try {
-          window.localStorage.setItem(key, "1");
-        } catch {
-          /* noop */
-        }
-        setAnnouncement({ text: data.text, ts: Date.now() });
-      } catch {
-        /* 取得失敗は静かに諦める (通常のチャットは使える) */
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [uiMode]);
 
   /* ---------- 送信フロー: assign → answer → 履歴保存 ---------- */
   async function handleSend(
@@ -559,14 +546,18 @@ export default function OfficeApp({
       <main className="flex-1 min-w-0 hidden md:flex flex-col">
         <div
           className="flex items-center gap-2 px-5 py-3 flex-shrink-0"
-          style={{ borderBottom: `1px solid ${LINE}`, background: CARD }}
+          style={{ borderBottom: `1px solid ${LINE}`, background: BG }}
         >
-          <span style={{ fontFamily: MARU, fontWeight: 900, fontSize: 17, color: NAVY }}>
+          <span style={{ fontFamily: MARU, fontWeight: 900, fontSize: 17, color: TEXT }}>
             🐾 BUHI WORKS
           </span>
-          <span style={{ fontSize: 10.5, color: MUTED, fontWeight: 700 }}>
-            AIバックオフィス v2.0
+          <span
+            className="rounded-md px-1.5 py-0.5"
+            style={{ fontSize: 10, color: "#BFD3FF", fontWeight: 800, background: CHIP, border: `1px solid ${LINE}` }}
+          >
+            v2.0
           </span>
+          <span style={{ fontSize: 10.5, color: MUTED, fontWeight: 700 }}>AIバックオフィス</span>
         </div>
 
         <div className="flex-1 min-h-0 overflow-y-auto buhi-scroll px-5 py-5">
@@ -648,7 +639,10 @@ export default function OfficeApp({
 
             {/* ミルク本体 + AGENT STATS */}
             <div className="flex flex-col items-center gap-4 flex-1 min-w-0 order-1 lg:order-2">
-              <div style={{ width: 280, height: 280 }} className="relative flex-shrink-0">
+              <div
+                style={{ width: 280, height: 280 }}
+                className="relative flex-shrink-0 rounded-3xl overflow-hidden"
+              >
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.div
                     key={dock.state}
@@ -658,7 +652,7 @@ export default function OfficeApp({
                     transition={{ duration: 0.45, ease: "easeInOut" }}
                     className="absolute inset-0 flex items-center justify-center"
                   >
-                    <MilkAnimation state={dock.state} size={280} />
+                    <MilkAnimation state={dock.state} size={280} manifest={MILK_PHOTO} />
                   </motion.div>
                 </AnimatePresence>
               </div>
@@ -669,7 +663,7 @@ export default function OfficeApp({
                   maxWidth: 420,
                   background: CARD,
                   border: `1px solid ${LINE}`,
-                  boxShadow: "0 2px 12px rgba(20,38,62,0.06)",
+                  boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
                 }}
               >
                 <div
@@ -678,7 +672,7 @@ export default function OfficeApp({
                     fontFamily: MARU,
                     fontWeight: 900,
                     fontSize: 13,
-                    color: NAVY,
+                    color: TEXT,
                     borderBottom: `1px solid ${LINE}`,
                   }}
                 >
@@ -707,14 +701,14 @@ export default function OfficeApp({
 
       {/* ==================== 右: エージェント・チャット ==================== */}
       <section
-        className="flex flex-col min-h-0 flex-1 md:flex-none md:w-[400px] lg:w-[430px]"
-        style={{ background: CARD, borderLeft: `1px solid ${LINE}` }}
+        className="flex flex-col min-h-0 flex-1 md:flex-none md:w-[600px] lg:w-[645px]"
+        style={{ background: BG, borderLeft: `1px solid ${LINE}` }}
       >
         <div
           className="px-4 py-3 flex items-center justify-between flex-shrink-0"
           style={{ borderBottom: `1px solid ${LINE}` }}
         >
-          <span style={{ fontFamily: MARU, fontWeight: 900, fontSize: 14, color: NAVY }}>
+          <span style={{ fontFamily: MARU, fontWeight: 900, fontSize: 14, color: TEXT }}>
             エージェント・チャット
           </span>
           {headerExpert && (
@@ -723,7 +717,7 @@ export default function OfficeApp({
               style={{ background: CHIP, border: `1px solid ${LINE}` }}
             >
               <Avatar expert={headerExpert} size={18} badge={false} />
-              <span style={{ fontSize: 10.5, fontWeight: 900, fontFamily: MARU, color: BLUE }}>
+              <span style={{ fontSize: 10.5, fontWeight: 900, fontFamily: MARU, color: "#BFD3FF" }}>
                 {pinnedExpert ? `指名: ${pinnedExpert.name}` : `担当: ${currentExpert!.name}`}
               </span>
             </div>
@@ -735,7 +729,6 @@ export default function OfficeApp({
           onAttachMeta={handleAttachMeta}
           onDockEvent={dock.trigger}
           reuseText={reuseText}
-          announcement={announcement}
           className="flex flex-col flex-1 min-h-0"
         />
       </section>
