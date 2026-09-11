@@ -15,6 +15,7 @@ import { DockState } from "@/lib/dock/DockState";
 import { useDockState } from "@/lib/dock/useDockState";
 import { SECRETARY_SLUG } from "@/lib/experts";
 import { createClient } from "@/lib/supabase/client";
+import { attachName, attachRef, kindFromName, resolveAttachUrl } from "@/lib/attachments";
 import { BG, BLUE, CARD, CHIP, LINE, MARU, MUTED, NAVY, RED, TEXT } from "@/lib/theme";
 import type {
   Attachment,
@@ -23,25 +24,13 @@ import type {
   Expert,
   HistoryEntry,
   PlainTurn,
+  StoredAttachment,
 } from "@/lib/types";
 
 /** Composer(onAttachMeta) が返す添付メタ情報 */
 type AttachMeta = { count: number; names: string[]; kinds: string[] };
 
 /* Storage URL から表示名・種別を導出するヘルパー */
-function nameFromUrl(u: string): string {
-  try {
-    return decodeURIComponent(u.split("/").pop() || u);
-  } catch {
-    return u;
-  }
-}
-function kindFromName(n: string): "image" | "pdf" | "text" {
-  const ext = (n.toLowerCase().split(".").pop() || "").trim();
-  if (["png", "jpg", "jpeg", "gif", "webp"].includes(ext)) return "image";
-  if (ext === "pdf") return "pdf";
-  return "text";
-}
 
 /* 履歴行→専門家: 名簿に居れば実物、削除済みなら履歴の情報から仮の姿を作る */
 function expertFromEntry(experts: Expert[], e: HistoryEntry): Expert {
@@ -156,7 +145,7 @@ export default function OfficeApp({
   /** Composerの添付メタ情報 (HistoryPanelの添付表示連動用) */
   const [attachMeta, setAttachMeta] = useState<AttachMeta | null>(null);
   /** 履歴↺で引き継ぐ前回添付の Storage URL リスト (次の送信で1回だけ消費) */
-  const [reuseAttachUrls, setReuseAttachUrls] = useState<string[]>([]);
+  const [reuseAttachs, setReuseAttachs] = useState<StoredAttachment[]>([]);
 
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingExpert, setEditingExpert] = useState<Expert | null>(null);
@@ -192,13 +181,13 @@ export default function OfficeApp({
     attachments: Attachment[] = []
   ): Promise<ChatSendResult> {
     if (uiMode === "entrance") setUiMode("office");
-    /* 今回のアップロード済みURL + ↺で引き継いだ前回URL */
-    const currentUrls = attachments
-      .map((a) => a.url)
-      .filter((u): u is string => !!u);
-    const allAttachUrls = [...currentUrls, ...reuseAttachUrls];
+    /* 今回のアップロード済み + ↺で引き継いだ前回分 (DB保存形式 {path,name}) */
+    const currentStored: StoredAttachment[] = attachments
+      .filter((a) => a.path || a.url)
+      .map((a) => (a.path ? { path: a.path, name: a.name } : (a.url as string)));
+    const allStored: StoredAttachment[] = [...currentStored, ...reuseAttachs];
     /* 担当決定・履歴表示の参考に使う人間可読な名前 */
-    const attachNames = allAttachUrls.map(nameFromUrl);
+    const attachNames = allStored.map(attachName);
     if (!secretary && !pinnedExpert) {
       throw new Error("専門家の名簿が読み込めていません。画面を再読み込みしてください");
     }
@@ -240,27 +229,38 @@ export default function OfficeApp({
         expertName: expert.name,
         specialty: expert.specialty,
         requestText: text,
-        attachments: allAttachUrls,
+        attachments: allStored,
         threadId,
       });
 
       /* 3. 回答生成 (添付をブロック化し、直近12ターンの文脈と同送)
-            画像/PDFは Storage URL を source.url で送る (base64はフォールバック) */
+            画像/PDFは private Storage の署名URL (短時間有効) を source.url で送る。
+            署名URLが発行できない場合は base64 にフォールバック */
       const blocks: ContentBlock[] = [];
       for (const a of attachments) {
+        if (a.kind !== "image" && a.kind !== "pdf") continue;
+        const ref = a.path || a.url;
+        let url: string | null = null;
+        if (ref) {
+          try {
+            url = await resolveAttachUrl(ref);
+          } catch (e) {
+            console.warn("署名URL発行に失敗。base64で送信します", e);
+          }
+        }
         if (a.kind === "image") {
           blocks.push(
-            a.url
-              ? { type: "image", source: { type: "url", url: a.url } }
+            url
+              ? { type: "image", source: { type: "url", url } }
               : {
                   type: "image",
                   source: { type: "base64", media_type: a.media || "image/png", data: a.b64! },
                 }
           );
-        } else if (a.kind === "pdf") {
+        } else {
           blocks.push(
-            a.url
-              ? { type: "document", source: { type: "url", url: a.url } }
+            url
+              ? { type: "document", source: { type: "url", url } }
               : {
                   type: "document",
                   source: { type: "base64", media_type: "application/pdf", data: a.b64! },
@@ -268,18 +268,20 @@ export default function OfficeApp({
           );
         }
       }
-      /* ↺再依頼: 前回添付URLを種別判定して image/document ブロックを再生成 */
-      for (const u of reuseAttachUrls) {
-        const k = kindFromName(nameFromUrl(u));
-        if (k === "image") {
-          blocks.push({ type: "image", source: { type: "url", url: u } });
-        } else if (k === "pdf") {
-          blocks.push({ type: "document", source: { type: "url", url: u } });
-        }
+      /* ↺再依頼: 前回添付を種別判定し、署名URLで image/document ブロックを再生成 */
+      for (const s of reuseAttachs) {
+        const k = kindFromName(attachName(s));
+        if (k !== "image" && k !== "pdf") continue;
+        const url = await resolveAttachUrl(attachRef(s));
+        blocks.push(
+          k === "image"
+            ? { type: "image", source: { type: "url", url } }
+            : { type: "document", source: { type: "url", url } }
+        );
       }
       let combined = "";
-      if (reuseAttachUrls.length > 0) {
-        combined += `【再依頼: 前回の添付 ${reuseAttachUrls.map(nameFromUrl).join("、")} を参照】\n\n`;
+      if (reuseAttachs.length > 0) {
+        combined += `【再依頼: 前回の添付 ${reuseAttachs.map(attachName).join("、")} を参照】\n\n`;
       }
       for (const a of attachments) {
         if (a.kind === "text") {
@@ -344,7 +346,7 @@ export default function OfficeApp({
   function handleReuse(text: string, entry?: HistoryEntry) {
     setShowHistory(false);
     setReuseText({ text, ts: Date.now() });
-    setReuseAttachUrls(entry ? entry.attachments : []);
+    setReuseAttachs(entry ? entry.attachments : []);
     if (entry) setDockAck({ expertSlug: entry.expert_slug, ts: Date.now() });
   }
 
@@ -354,7 +356,7 @@ export default function OfficeApp({
     threadIdRef.current = null;
     turnsRef.current = [];
     setCurrentExpert(null);
-    setReuseAttachUrls([]);
+    setReuseAttachs([]);
     setResetSignal({ ts: Date.now() });
   }
 
@@ -376,9 +378,15 @@ export default function OfficeApp({
         messages.push({
           role: "user",
           text: r.request_text,
-          attachments: r.attachments.map((u, i) => {
-            const name = nameFromUrl(u);
-            return { id: `hist-${r.id}-${i}`, name, kind: kindFromName(name), url: u };
+          attachments: r.attachments.map((s, i) => {
+            const name = attachName(s);
+            const ref = attachRef(s);
+            return {
+              id: `hist-${r.id}-${i}`,
+              name,
+              kind: kindFromName(name),
+              ...(typeof s === "string" ? { url: ref } : { path: ref }),
+            };
           }),
         });
         messages.push({ role: "route", expert, note: "" });
@@ -403,7 +411,7 @@ export default function OfficeApp({
 
       threadIdRef.current = entry.thread_id;
       turnsRef.current = turns.slice(-24);
-      setReuseAttachUrls([]);
+      setReuseAttachs([]);
       setCurrentExpert(lastExpert);
       if (lastExpert) setDockAck({ expertSlug: lastExpert.slug, ts: Date.now() });
       if (uiMode === "entrance") setUiMode("office");

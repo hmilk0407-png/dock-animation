@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
-import type { HistoryEntry } from "@/lib/types";
+import type { HistoryEntry, StoredAttachment } from "@/lib/types";
 
 export const MAX_HISTORY = 200; // 表示・保持の上限 (古い順に自動削除)
 export const MAX_REQ_CHARS = 2000; // 依頼本文の保存上限文字数
@@ -34,7 +34,7 @@ export function useHistory() {
     expertName: string;
     specialty: string;
     requestText: string;
-    attachments: string[];
+    attachments: StoredAttachment[];
     /** 会話のまとまり (OfficeApp が採番・保持する) */
     threadId: string;
   }): Promise<string | null> {

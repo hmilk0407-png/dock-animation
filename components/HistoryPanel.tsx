@@ -6,6 +6,7 @@ import Avatar from "./avatars/Avatar";
 import { MAX_HISTORY, fmtDateTime } from "@/hooks/useHistory";
 import { BLUE, CARD, CHIP, LINE, MARU, MUTED, RED, TEXT } from "@/lib/theme";
 import type { Expert, HistoryEntry } from "@/lib/types";
+import { attachName, attachRef, openAttachment } from "@/lib/attachments";
 
 /* ============================================================
    HistoryPanel — 依頼履歴パネル
@@ -367,36 +368,30 @@ export default function HistoryPanel({
 
                   {e.attachments.length > 0 && (
                     <div className="flex flex-wrap gap-1 mt-1.5">
-                      {e.attachments.map((u, i) => {
-                        const nm = attachName(u);
-                        const isUrl = /^https?:\/\//.test(u);
-                        return isUrl ? (
-                          <a
+                      {e.attachments.map((s, i) => {
+                        const nm = attachName(s);
+                        const ref = attachRef(s);
+                        return (
+                          <button
                             key={i}
-                            href={u}
-                            target="_blank"
-                            rel="noopener noreferrer"
+                            type="button"
                             title={nm}
+                            onClick={() => {
+                              void openAttachment(ref).catch((err) =>
+                                alert(err instanceof Error ? err.message : "添付を開けませんでした")
+                              );
+                            }}
                             className="px-1.5 py-0.5 rounded"
                             style={{
                               fontSize: 9.5,
                               background: "rgba(46,95,216,0.12)",
                               border: "1px solid rgba(46,95,216,0.25)",
                               color: BLUE,
-                              textDecoration: "none",
+                              cursor: "pointer",
                             }}
                           >
                             📎 {nm}
-                          </a>
-                        ) : (
-                          <span
-                            key={i}
-                            title={nm}
-                            className="px-1.5 py-0.5 rounded"
-                            style={{ fontSize: 9.5, background: "#2C3541", color: MUTED }}
-                          >
-                            📎 {nm}
-                          </span>
+                          </button>
                         );
                       })}
                     </div>
@@ -511,14 +506,6 @@ export default function HistoryPanel({
 }
 
 /* Storage URL から表示名を導出 (履歴の添付はURL文字列で保存されている) */
-function attachName(u: string): string {
-  try {
-    return decodeURIComponent(u.split("/").pop() || u);
-  } catch {
-    return u;
-  }
-}
-
 /* 履歴行の表示用: 名簿に居れば実物、削除済みなら履歴の情報から仮の姿を作る */
 function expertOf(experts: Expert[], e: HistoryEntry): Expert {
   return (

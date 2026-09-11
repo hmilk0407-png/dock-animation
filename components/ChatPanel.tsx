@@ -7,6 +7,7 @@ import Composer from "./Composer";
 import Avatar from "./avatars/Avatar";
 import { fileToAttachment } from "@/lib/files";
 import { createClient } from "@/lib/supabase/client";
+import { ATTACH_BUCKET, safeStorageName } from "@/lib/attachments";
 import { SECRETARY_SLUG } from "@/lib/experts";
 import { BG, MARU, MUTED } from "@/lib/theme";
 import type { Attachment, ChatMessage, Expert } from "@/lib/types";
@@ -147,18 +148,19 @@ export default function ChatPanel({
       try {
         /* プレビュー・テキスト抽出用に従来通り変換 (画像サムネイルはb64を使用) */
         const att = await fileToAttachment(file);
-        /* Storageへ保存: `${uuid}/${safeName}` (bucket: attachments)
-           ※ Storage のキーは ASCII 英数字・-_. 以外を受け付けないため、
-              日本語や全角記号を含む元ファイル名はキーに使わない (表示名は att.name を使用) */
-        const ext = (file.name.match(/\.([A-Za-z0-9]{1,8})$/)?.[1] || "bin").toLowerCase();
-        const base = file.name.replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "file";
-        const path = `${crypto.randomUUID()}/${base}.${ext}`;
+        /* Storageへ保存 (private bucket: attachments)
+           パス: `${userId}/${uuid}/${asciiName}` — ポリシーで自分のフォルダのみ読み書き可。
+           表示名は att.name (元のファイル名) を使い、キーには ASCII 化した名前を使う */
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
+        if (!user) throw new Error("ログインが切れています。再読み込みしてください");
+        const path = `${user.id}/${crypto.randomUUID()}/${safeStorageName(file.name)}`;
         const { error: upErr } = await supabase.storage
-          .from("attachments")
+          .from(ATTACH_BUCKET)
           .upload(path, file, { upsert: false });
         if (upErr) throw upErr;
-        const { data: pub } = supabase.storage.from("attachments").getPublicUrl(path);
-        att.url = pub.publicUrl;
+        att.path = path;
         setAttachments((a) => [...a, att]);
       } catch (err) {
         setMessages((m) => [
@@ -178,9 +180,8 @@ export default function ChatPanel({
   function removeAttachment(id: string) {
     const target = attachments.find((a) => a.id === id);
     setAttachments((a) => a.filter((x) => x.id !== id));
-    if (target?.url) {
-      const path = target.url.split("/attachments/")[1];
-      if (path) void supabase.storage.from("attachments").remove([decodeURIComponent(path)]);
+    if (target?.path) {
+      void supabase.storage.from(ATTACH_BUCKET).remove([target.path]);
     }
   }
 

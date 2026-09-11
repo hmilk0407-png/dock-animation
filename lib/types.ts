@@ -43,9 +43,17 @@ export interface Attachment {
   text?: string;
   b64?: string;
   media?: string;
-  /** Supabase Storage の公開URL (アップロード完了後に設定) */
+  /** Supabase Storage のパス `${userId}/${uuid}/${name}` (アップロード完了後に設定) */
+  path?: string;
+  /** 旧データ互換: public バケット時代の公開URL */
   url?: string;
 }
+
+/**
+ * requests.attachments の要素。
+ * 新形式は {path, name}。旧形式 (public バケット時代) は公開URLの文字列。
+ */
+export type StoredAttachment = string | { path: string; name: string };
 
 /** チャットメッセージ (セッション内) */
 export type ChatMessage =
@@ -61,7 +69,7 @@ export interface HistoryEntry {
   expert_name: string;
   specialty: string;
   request_text: string;
-  attachments: string[];
+  attachments: StoredAttachment[];
   response_preview: string | null;
   artifact_url: string | null;
   status: "waiting" | "done" | "error";
