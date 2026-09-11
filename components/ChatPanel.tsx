@@ -35,6 +35,8 @@ export type ChatSendResult = {
   note?: string;
   /** 回答本文 (Markdown) */
   answer: string;
+  /** 履歴 (requests) の行ID。Googleドキュメント出力時の紐付けに使う */
+  historyId?: string | null;
 };
 
 export default function ChatPanel({
@@ -43,6 +45,7 @@ export default function ChatPanel({
   onAttachMeta,
   onDockEvent,
   reuseText = null,
+  onDocCreated,
   announcement = null,
   resetSignal = null,
   loadThread = null,
@@ -58,6 +61,8 @@ export default function ChatPanel({
   onDockEvent?: (event: DockEvent) => void;
   /** 履歴↺再依頼: ts が変わるたび text を InputBar に流し込みフォーカスする */
   reuseText?: { text: string; ts: number } | null;
+  /** Googleドキュメント出力後に履歴 (artifact_url) を更新してもらう */
+  onDocCreated?: (historyId: string, url: string) => void;
   /** 受付ミルクからのお知らせ (朝の予定読み上げ等): ts が変わるたび吹き出しを追加 */
   announcement?: { text: string; ts: number } | null;
   /** 「新しい依頼」: ts が変わるたび吹き出し・入力・添付をすべて空にする */
@@ -185,6 +190,39 @@ export default function ChatPanel({
     }
   }
 
+  /* ---------- Googleドキュメント出力: 回答本文を /api/gdoc へ ---------- */
+  const [docBusy, setDocBusy] = useState<number | null>(null);
+  async function exportDoc(index: number) {
+    const m = messages[index];
+    if (!m || m.role !== "assistant" || docBusy !== null) return;
+    setDocBusy(index);
+    try {
+      /* タイトル: 本文の最初の見出し → なければ担当名+日時 */
+      const heading = m.text.match(/^#{1,3}\s+(.+)$/m)?.[1]?.replace(/\*\*/g, "").trim();
+      const stamp = new Date().toLocaleString("ja-JP", { dateStyle: "medium", timeStyle: "short" });
+      const title = heading || `${m.expert.name}の回答 ${stamp}`;
+      const res = await fetch("/api/gdoc", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, markdown: m.text, historyId: m.historyId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.url) throw new Error(data.error || "作成に失敗しました");
+      setMessages((prev) =>
+        prev.map((x, i) => (i === index && x.role === "assistant" ? { ...x, docUrl: data.url } : x))
+      );
+      if (m.historyId) onDocCreated?.(m.historyId, data.url);
+      window.open(data.url, "_blank", "noopener,noreferrer");
+    } catch (err) {
+      setMessages((prev) => [
+        ...prev,
+        { role: "error", text: `Googleドキュメントの出力に失敗しました: ${err instanceof Error ? err.message : ""}` },
+      ]);
+    } finally {
+      setDocBusy(null);
+    }
+  }
+
   /* ---------- 送信: Composer から受け取り OfficeApp へ渡す (添付同送) ---------- */
   async function handleSend() {
     const text = input.trim();
@@ -200,7 +238,12 @@ export default function ChatPanel({
       setMessages((m) => [
         ...m,
         { role: "route", expert: result.expert, note: result.note || "" },
-        { role: "assistant", expert: result.expert, text: result.answer },
+        {
+          role: "assistant",
+          expert: result.expert,
+          text: result.answer,
+          historyId: result.historyId || undefined,
+        },
       ]);
     } catch (err) {
       setMessages((m) => [
@@ -258,6 +301,8 @@ export default function ChatPanel({
             phase={busy ? "routing" : "idle"}
             workingExpert={busy ? secretary : null}
             secretaryName={secretaryName}
+            onExportDoc={(i) => void exportDoc(i)}
+            docBusyIndex={docBusy}
           />
 
           {/* 最新の回答: Framer Motion でフェードイン */}
@@ -273,6 +318,9 @@ export default function ChatPanel({
                 phase="idle"
                 workingExpert={null}
                 secretaryName={secretaryName}
+                indexOffset={stable.length}
+                onExportDoc={(i) => void exportDoc(i)}
+                docBusyIndex={docBusy}
               />
             </motion.div>
           )}

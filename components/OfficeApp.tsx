@@ -321,7 +321,7 @@ export default function OfficeApp({
       turnsRef.current = [...turnsRef.current, ...newTurns].slice(-24);
 
       dock.trigger({ type: "api:success" });
-      return { expert, note, answer };
+      return { expert, note, answer, historyId };
     } catch (err) {
       dock.trigger({ type: "api:error" });
       /* 履歴: waiting → error */
@@ -404,7 +404,13 @@ export default function OfficeApp({
           (r.response_preview
             ? `${r.response_preview}…\n\n（この回答は要約のみ保存されています）`
             : "（回答は保存されていません）");
-        messages.push({ role: "assistant", expert, text: answer });
+        messages.push({
+          role: "assistant",
+          expert,
+          text: answer,
+          historyId: r.id,
+          docUrl: r.artifact_url || undefined,
+        });
         turns.push({ role: "user", content: r.request_text });
         turns.push({ role: "assistant", content: answer });
       }
@@ -858,6 +864,7 @@ export default function OfficeApp({
           onAttachMeta={handleAttachMeta}
           onDockEvent={dock.trigger}
           reuseText={reuseText}
+          onDocCreated={(id, url) => void history.updateEntry(id, { artifact_url: url })}
           resetSignal={resetSignal}
           loadThread={loadThread}
           className="flex flex-col flex-1 min-h-0"

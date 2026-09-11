@@ -397,6 +397,24 @@ export default function HistoryPanel({
                     </div>
                   )}
 
+                  {e.artifact_url && (
+                    <a
+                      href={e.artifact_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-block px-1.5 py-0.5 rounded mt-1.5"
+                      style={{
+                        fontSize: 9.5,
+                        background: "rgba(46,95,216,0.12)",
+                        border: "1px solid rgba(46,95,216,0.25)",
+                        color: BLUE,
+                        textDecoration: "none",
+                      }}
+                    >
+                      📄 Googleドキュメント
+                    </a>
+                  )}
+
                   {e.response_preview && (
                     <div
                       style={{

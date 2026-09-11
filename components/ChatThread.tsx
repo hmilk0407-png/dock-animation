@@ -18,11 +18,20 @@ export default function ChatThread({
   phase,
   workingExpert,
   secretaryName,
+  onExportDoc,
+  docBusyIndex = null,
+  indexOffset = 0,
 }: {
   messages: ChatMessage[];
   phase: "idle" | "routing" | "working";
   workingExpert: Expert | null;
   secretaryName: string;
+  /** 回答の「Googleドキュメントに出力」。引数は ChatPanel 全体でのメッセージ index */
+  onExportDoc?: (index: number) => void;
+  /** 出力処理中のメッセージ index (ボタンを無効化する) */
+  docBusyIndex?: number | null;
+  /** messages が全体の一部 (fresh) のとき、全体 index に直すためのオフセット */
+  indexOffset?: number;
 }) {
   return (
     <>
@@ -121,6 +130,39 @@ export default function ChatThread({
               >
                 <Markdown text={m.text} />
               </div>
+              {onExportDoc && (
+                <div className="flex gap-2 mt-1" style={{ fontSize: 11 }}>
+                  {m.docUrl ? (
+                    <a
+                      href={m.docUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-2 py-0.5 rounded-full"
+                      style={{ background: CHIP, border: "1px solid #3A4E75", color: BLUE, textDecoration: "none", fontWeight: 700 }}
+                      data-testid="gdoc-link"
+                    >
+                      📄 ドキュメントを開く
+                    </a>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onExportDoc(i + indexOffset)}
+                      disabled={docBusyIndex !== null}
+                      className="px-2 py-0.5 rounded-full"
+                      style={{
+                        background: "transparent",
+                        border: `1px solid ${LINE}`,
+                        color: docBusyIndex === i + indexOffset ? MUTED : TEXT,
+                        cursor: docBusyIndex !== null ? "wait" : "pointer",
+                        opacity: docBusyIndex !== null && docBusyIndex !== i + indexOffset ? 0.5 : 1,
+                      }}
+                      data-testid="gdoc-export"
+                    >
+                      {docBusyIndex === i + indexOffset ? "📄 作成中…" : "📄 Googleドキュメントに出力"}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );

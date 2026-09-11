@@ -59,7 +59,15 @@ export type StoredAttachment = string | { path: string; name: string };
 export type ChatMessage =
   | { role: "user"; text: string; attachments: Attachment[] }
   | { role: "route"; expert: Expert; note: string }
-  | { role: "assistant"; expert: Expert; text: string }
+  | {
+      role: "assistant";
+      expert: Expert;
+      text: string;
+      /** 対応する requests.id (Googleドキュメント出力時に artifact_url を紐付ける) */
+      historyId?: string;
+      /** 出力済み Google ドキュメントの URL */
+      docUrl?: string;
+    }
   | { role: "error"; text: string };
 
 /** 依頼履歴 (DBの requests 行。snake_caseのまま扱う) */
