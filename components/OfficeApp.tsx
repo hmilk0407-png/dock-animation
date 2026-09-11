@@ -300,7 +300,18 @@ export default function OfficeApp({
           blocks,
         }),
       });
-      const answerData = await answerRes.json();
+      /* Vercel のタイムアウト等は平文で返るので JSON 解釈の前に判定する */
+      const answerRaw = await answerRes.text();
+      let answerData: { text?: string; error?: string } = {};
+      try {
+        answerData = JSON.parse(answerRaw);
+      } catch {
+        throw new Error(
+          answerRes.status === 504
+            ? "回答の生成に時間がかかりすぎました。依頼を分ける／短くして再送してください"
+            : `サーバーエラー (${answerRes.status})`
+        );
+      }
       if (!answerRes.ok) throw new Error(answerData.error || "回答生成に失敗しました");
       const answer: string = answerData.text || "";
 

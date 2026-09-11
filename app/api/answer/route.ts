@@ -5,7 +5,7 @@ import type { ContentBlock, PlainTurn } from "@/lib/types";
 import { SECRETARY_SLUG } from "@/lib/experts";
 import { eventsForPrompt, sanitizeEvents, todayJst } from "@/lib/calendar";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 /**
  * POST /api/answer
