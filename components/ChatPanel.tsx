@@ -147,8 +147,12 @@ export default function ChatPanel({
       try {
         /* プレビュー・テキスト抽出用に従来通り変換 (画像サムネイルはb64を使用) */
         const att = await fileToAttachment(file);
-        /* Storageへ保存: `${uuid}/${originalName}` (bucket: attachments) */
-        const path = `${crypto.randomUUID()}/${file.name}`;
+        /* Storageへ保存: `${uuid}/${safeName}` (bucket: attachments)
+           ※ Storage のキーは ASCII 英数字・-_. 以外を受け付けないため、
+              日本語や全角記号を含む元ファイル名はキーに使わない (表示名は att.name を使用) */
+        const ext = (file.name.match(/\.([A-Za-z0-9]{1,8})$/)?.[1] || "bin").toLowerCase();
+        const base = file.name.replace(/\.[^.]*$/, "").replace(/[^A-Za-z0-9_-]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 40) || "file";
+        const path = `${crypto.randomUUID()}/${base}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("attachments")
           .upload(path, file, { upsert: false });
